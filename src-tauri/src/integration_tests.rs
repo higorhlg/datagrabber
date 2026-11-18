@@ -283,3 +283,32 @@ async fn meta_statements_stop_after_the_time_limit() {
     let console_timeout = run_statement(&console, "show statement_timeout", 10).await.unwrap();
     assert_eq!(console_timeout.rows, vec![vec![Some("0".to_string())]], "consoles keep no time limit");
 }
+
+#[tokio::test]
+async fn stop_cancels_a_slow_table_page() {
+    require_pg!();
+    let sessions = std::sync::Arc::new(Sessions::default());
+    sessions.open(config("stop", false), Some(PASSWORD.into())).await.unwrap();
+    let running = {
+        let sessions = sessions.clone();
+        tokio::spawn(async move {
+            let request = crate::query::TablePageRequest {
+                schema: "pg_catalog".into(),
+                table: "pg_class".into(),
+                filter: Some("pg_sleep(20) is not null".into()),
+                order_by: None,
+                limit: 10,
+                offset: 0,
+            };
+            crate::query::fetch_table_page(&sessions.get("stop").unwrap(), &request).await
+        })
+    };
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    let started = std::time::Instant::now();
+    sessions.cancel_meta("stop").await.unwrap();
+    let error = running.await.unwrap().unwrap_err();
+    assert_eq!(error.code.as_deref(), Some("57014"));
+    assert!(started.elapsed() < Duration::from_secs(3));
+    let after = crate::query::count_table_rows(&sessions.get("stop").unwrap(), "pg_catalog", "pg_am", &None).await.unwrap();
+    assert!(after > 0, "meta connection usable after a stop");
+}

@@ -140,6 +140,12 @@ pub async fn table_page(id: String, request: TablePageRequest, sessions: State<'
     })
 }
 
+/// Stops a slow table page, count or schema load (anything on the meta connection).
+#[tauri::command]
+pub async fn cancel_table_query(id: String, sessions: State<'_, Sessions>) -> CommandResult<()> {
+    sessions.cancel_meta(&id).await
+}
+
 /// Counts the rows matching a table tab's filter.
 #[tauri::command]
 pub async fn table_count(id: String, schema: String, table: String, filter: Option<String>, sessions: State<'_, Sessions>) -> CommandResult<u64> {

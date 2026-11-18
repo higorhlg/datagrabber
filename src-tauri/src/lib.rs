@@ -36,6 +36,7 @@ pub fn run() {
             commands::cancel_query,
             commands::table_page,
             commands::table_count,
+            commands::cancel_table_query,
             commands::object_ddl,
             commands::list_saved_queries,
             commands::save_query,

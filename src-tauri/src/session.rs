@@ -37,6 +37,8 @@ pub struct Session {
     pub console: Mutex<Client>,
     pub meta: Client,
     pub cancel: CancelToken,
+    /// Cancels what the meta connection is running (a slow table page, count or introspection).
+    pub meta_cancel: CancelToken,
     pub tls: MakeTlsConnector,
     pub server_version: String,
     broken: Arc<AtomicBool>,
@@ -177,7 +179,16 @@ impl Sessions {
         let meta = open_client(&config, &password, &tls, broken.clone()).await.map_err(connect_error)?;
         meta.batch_execute(&meta_guards_sql()).await.map_err(connect_error)?;
         let server_version = server_version(&console).await.map_err(connect_error)?;
-        let session = Arc::new(Session { cancel: console.cancel_token(), console: Mutex::new(console), meta, tls, server_version, broken, config });
+        let session = Arc::new(Session {
+            cancel: console.cancel_token(),
+            meta_cancel: meta.cancel_token(),
+            console: Mutex::new(console),
+            meta,
+            tls,
+            server_version,
+            broken,
+            config,
+        });
         self.open.lock().unwrap().insert(session.config.id.clone(), session.clone());
         Ok(session)
     }
@@ -185,6 +196,12 @@ impl Sessions {
     /// Closes a session; dropping both clients ends their connections.
     pub fn close(&self, id: &str) {
         self.open.lock().unwrap().remove(id);
+    }
+
+    /// Asks the server to cancel what the meta connection is running (table tab Stop button).
+    pub async fn cancel_meta(&self, id: &str) -> CommandResult<()> {
+        let session = self.get(id)?;
+        session.meta_cancel.cancel_query(session.tls.clone()).await.map_err(|e| CommandError::new(describe_pg_error(&e)))
     }
 
     /// Asks the server to cancel what the console connection is running.

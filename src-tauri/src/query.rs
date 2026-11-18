@@ -259,9 +259,13 @@ fn explain_meta_timeouts(mut error: QueryError) -> QueryError {
             );
             error.hint = Some("Try again in a moment, or check pg_locks / pg_stat_activity for the blocker.".to_string());
         }
-        Some("57014") => {
+        Some("57014") if error.message.contains("statement timeout") => {
             error.message = format!("Stopped after {}s to avoid a long-running query.", crate::session::META_STATEMENT_TIMEOUT_SECS);
             error.hint = Some("Add a filter, sort by an indexed column, or run it from a console (no time limit, cancellable).".to_string());
+        }
+        Some("57014") => {
+            error.message = "Stopped.".to_string();
+            error.hint = None;
         }
         _ => {}
     }
