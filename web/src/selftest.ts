@@ -14,7 +14,7 @@ import { monaco } from './monaco-setup.ts';
  * - "import": import every DataGrip data source through the import dialog, check prod ones are
  *   read-only, and check a connection asks for its password without contacting the server.
  */
-type SelfTestConfig = { scenario: 'sample' | 'import'; samplePort?: number; expectedImports?: number; holdMs?: number; addSample?: boolean };
+type SelfTestConfig = { scenario: 'sample' | 'import' | 'passwords'; samplePort?: number; expectedImports?: number; holdMs?: number; addSample?: boolean; datagripDir?: string };
 
 const SAMPLE_NAME = 'Sample shop (PGlite)';
 const log: string[] = [];
@@ -269,6 +269,49 @@ async function importScenario(config: SelfTestConfig): Promise<void> {
   });
 }
 
+/**
+ * Runs the DataGrip password-copy scenario against a fake DataGrip project (two data sources on
+ * the sample DB) and fake DataGrip Keychain items held in memory: only "Fake shop dev" has one.
+ */
+async function passwordsScenario(config: SelfTestConfig): Promise<void> {
+  await step('import the fake DataGrip project', async () => {
+    document.querySelector<HTMLButtonElement>('button[title="Import from DataGrip"]')!.click();
+    const dir = await waitFor('import folder field', () => document.querySelector<HTMLInputElement>('.import-dir input'));
+    await waitFor('default scan finished', () => dir.value !== '');
+    typeInto(dir, config.datagripDir!);
+    byText('.import-dir button', 'Scan')!.click();
+    await waitFor('fake sources listed', () => all('.import-table tbody tr').length === 2 && byText('.import-table td', 'Fake shop dev'));
+    all<HTMLButtonElement>('.modal-foot button.primary')[0].click();
+    await waitFor('imported', () => treeRow('Fake shop dev') && treeRow('Fake shop prod'));
+  });
+
+  await step('copy passwords from DataGrip: one copied, one not found, nothing leaked to the UI', async () => {
+    document.querySelector<HTMLButtonElement>('[data-testid=copy-passwords]')!.click();
+    (await waitFor('confirm button', () => document.querySelector<HTMLButtonElement>('[data-testid=start-copy]'))).click();
+    const results = await waitFor('copy results', () => document.querySelector('[data-testid=copy-results]'));
+    const text = results.textContent ?? '';
+    log.push(`     ${text.replace(/\s+/g, ' ')}`);
+    if (!/Fake shop dev.*Copied/.test(text) || !/Fake shop prod.*No password saved in DataGrip/.test(text)) throw new Error(`unexpected results: ${text}`);
+    if (document.body.innerHTML.includes('fake-password')) throw new Error('password leaked into the page');
+    byText('.modal-foot button', 'Done')!.click();
+    const listed = await api.listConnections();
+    if (!listed.find((c) => c.name === 'Fake shop dev')?.passwordSaved) throw new Error('dev connection should have a saved password');
+  });
+
+  await step('the copied connection opens without asking for a password', async () => {
+    treeRow('Fake shop dev')!.click();
+    await waitFor('tables of the copied connection', () => treeRow('customers'), 15_000);
+    if (document.querySelector('.modal')) throw new Error('no password prompt expected');
+  });
+
+  await step('the other connection asks, and "Use the password saved in DataGrip" explains there is none', async () => {
+    treeRow('Fake shop prod')!.click();
+    (await waitFor('use DataGrip password link', () => document.querySelector<HTMLButtonElement>('[data-testid=use-datagrip-password]'))).click();
+    await waitFor('explanation', () => byText('.modal .status.error', /no saved password/i));
+    byText('.modal-foot button', 'Cancel')!.click();
+  });
+}
+
 /** UI preferences kept in localStorage, which the installed app shares (same app identifier). */
 const PREFERENCE_KEYS = ['datagrabber.explorer.showAllKinds', 'datagrabber.console.libraryOpen'];
 
@@ -291,6 +334,7 @@ export async function runSelfTestIfRequested(): Promise<void> {
     if (showAll?.getAttribute('aria-pressed') === 'true') showAll.click();
     await sleep(300);
     if (config.scenario === 'sample') await sampleScenario(config);
+    else if (config.scenario === 'passwords') await passwordsScenario(config);
     else await importScenario(config);
   } catch (error) {
     ok = false;

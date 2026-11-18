@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -8,6 +9,7 @@ import { parseArgs } from 'node:util';
  *
  *   pnpm e2e --scenario sample [--home <dir>] [--screenshot out.png]
  *   pnpm e2e --scenario import [--expected 8] [--add-sample]
+ *   pnpm e2e --scenario passwords --home <dir>   (fake DataGrip project + fake DataGrip Keychain items)
  *
  * Builds a debug app (frontend embedded), starts the PGlite sample DB if it isn't running,
  * launches the app with DATAGRABBER_E2E set and exits with the self-test's status.
@@ -72,7 +74,30 @@ const config = {
   addSample: values['add-sample'],
   holdMs: values.screenshot ? 2500 : 300,
 };
-const env: NodeJS.ProcessEnv = { ...process.env, DATAGRABBER_E2E: JSON.stringify(config), DATAGRABBER_SECRETS: 'memory' };
+/**
+ * Writes a fake DataGrip project with two data sources pointing at the sample DB, and returns the
+ * fake DataGrip Keychain items (only the first source has a saved password).
+ */
+function fakeDatagripProject(dir: string): [string, string, string][] {
+  mkdirSync(dir, { recursive: true });
+  const source = (uuid: string, name: string) =>
+    `<data-source source="LOCAL" name="${name}" uuid="${uuid}"><driver-ref>postgresql</driver-ref><jdbc-url>jdbc:postgresql://127.0.0.1:${samplePort}/postgres</jdbc-url></data-source>`;
+  writeFileSync(join(dir, 'dataSources.xml'), `<project version="4"><component name="DataSourceManagerImpl">${source('e2e-dev', 'Fake shop dev')}${source('e2e-prod', 'Fake shop prod')}</component></project>`);
+  writeFileSync(
+    join(dir, 'dataSources.local.xml'),
+    `<project version="4"><component name="dataSourceStorageLocal"><data-source name="Fake shop dev" uuid="e2e-dev"><user-name>postgres</user-name></data-source><data-source name="Fake shop prod" uuid="e2e-prod"><user-name>postgres</user-name></data-source></component></project>`,
+  );
+  return [['IntelliJ Platform DB \u2014 e2e-dev', 'postgres', 'fake-password']];
+}
+
+const env: NodeJS.ProcessEnv = { ...process.env, DATAGRABBER_E2E: '', DATAGRABBER_SECRETS: 'memory' };
+if (values.scenario === 'passwords') {
+  if (!values.home) throw new Error('--scenario passwords needs --home');
+  const datagripDir = join(values.home, 'fake-datagrip');
+  env.DATAGRABBER_TEST_EXTERNAL_SECRETS = JSON.stringify(fakeDatagripProject(datagripDir));
+  Object.assign(config, { datagripDir });
+}
+env.DATAGRABBER_E2E = JSON.stringify(config);
 if (values.home) env.DATAGRABBER_HOME = values.home;
 
 const app = spawn(binary, [], { env, stdio: ['ignore', 'pipe', 'inherit'] });
