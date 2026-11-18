@@ -1,0 +1,29 @@
+[package]
+name = "datagrabber"
+version = "0.1.0"
+description = "A personal PostgreSQL client"
+authors = ["Higor"]
+edition = "2024"
+rust-version = "1.90"
+
+[lib]
+name = "datagrabber_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.5", features = [] }
+
+[dependencies]
+tauri = { version = "2.12.6", features = [] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread"] }
+tokio-postgres = "0.7"
+postgres-native-tls = "0.5"
+native-tls = "0.2"
+futures-util = "0.3"
+keyring = { version = "3", features = ["apple-native"] }
+roxmltree = "0.20"
+uuid = { version = "1", features = ["v4"] }
+dirs = "6"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
