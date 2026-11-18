@@ -1,5 +1,6 @@
 import { Editor } from '@monaco-editor/react';
 import { useEditorTheme } from '../theme.ts';
+import { LoadingMessage } from './Loading.tsx';
 
 type DdlViewerProps = { ddl: string | undefined; error?: string };
 
@@ -7,7 +8,7 @@ type DdlViewerProps = { ddl: string | undefined; error?: string };
 export function DdlViewer({ ddl, error }: DdlViewerProps) {
   const theme = useEditorTheme();
   if (error) return <div className="query-error"><strong>{error}</strong></div>;
-  if (ddl === undefined) return <div className="grid-message">Loading DDL…</div>;
+  if (ddl === undefined) return <LoadingMessage>Loading DDL…</LoadingMessage>;
   return (
     <div className="ddl-viewer" data-testid="ddl-viewer">
       <Editor

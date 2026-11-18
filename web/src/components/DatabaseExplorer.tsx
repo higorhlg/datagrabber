@@ -28,8 +28,13 @@ import {
 import type { ConnectionSummary, DatabaseSchema, RelationInfo, RoutineInfo, SchemaInfo } from '../../../shared/types.ts';
 import { quoteIdent } from '../completion.ts';
 import { ContextMenu, type MenuItem } from './ContextMenu.tsx';
+import { Spinner, SkeletonTree } from './Loading.tsx';
 
-export type SchemaState = { status: 'loading' } | { status: 'ready'; schema: DatabaseSchema } | { status: 'error'; message: string };
+/** Explorer data for a connection; `refreshing` keeps the old tree visible while it reloads. */
+export type SchemaState = { status: 'loading' } | { status: 'ready'; schema: DatabaseSchema; refreshing?: boolean } | { status: 'error'; message: string };
+
+/** What a connection is waiting on while it opens. */
+export type ConnectionPhase = 'connecting' | 'password';
 
 /** An object picked in the explorer, with the breadcrumb that leads to it. */
 export type ExplorerSelection = { key: string; connectionId: string; path: string[] };
@@ -56,6 +61,9 @@ export type ExplorerActions = {
 type DatabaseExplorerProps = {
   connections: ConnectionSummary[];
   schemas: Record<string, SchemaState | undefined>;
+  phases: Record<string, ConnectionPhase | undefined>;
+  /** Last connection failure per connection, shown under it with a Retry link. */
+  connectErrors: Record<string, string | undefined>;
   selection: ExplorerSelection | undefined;
   onSelect: (selection: ExplorerSelection) => void;
   actions: ExplorerActions;
@@ -146,7 +154,7 @@ function Row({ depth, icon, label, extra, expandable, open, selected, onToggle, 
 }
 
 /** DataGrip-style explorer: connections → database → schemas → object folders → objects → details. */
-export function DatabaseExplorer({ connections, schemas, selection, onSelect, actions }: DatabaseExplorerProps) {
+export function DatabaseExplorer({ connections, schemas, phases, connectErrors, selection, onSelect, actions }: DatabaseExplorerProps) {
   const [filter, setFilter] = useState('');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [menu, setMenu] = useState<Menu>();
@@ -229,6 +237,9 @@ export function DatabaseExplorer({ connections, schemas, selection, onSelect, ac
           const connKey = c.id;
           const connOpen = c.connected && isOpen(connKey, true);
           const connectionPath = [c.name];
+          const phase = phases[c.id];
+          const connectError = connectErrors[c.id];
+          const refreshing = state?.status === 'ready' && state.refreshing;
           return (
             <div key={c.id} style={{ ['--conn-color' as string]: c.color }}>
               <Row
@@ -237,9 +248,17 @@ export function DatabaseExplorer({ connections, schemas, selection, onSelect, ac
                 expandable
                 open={connOpen}
                 selected={selection?.key === connKey}
-                icon={<span className="conn-icon"><Server size={15} />{c.connected && <span className="conn-live" />}</span>}
+                icon={phase ? <Spinner size={13} /> : <span className="conn-icon"><Server size={15} />{c.connected && <span className="conn-live" />}</span>}
                 label={c.name}
-                extra={c.readOnly ? <span className="badge ro">RO</span> : undefined}
+                extra={
+                  phase || refreshing || c.readOnly ? (
+                    <>
+                      {c.readOnly && <span className="badge ro">RO</span>}
+                      {phase && <span className="phase-label">{phase === 'password' ? 'waiting for password…' : 'connecting…'}</span>}
+                      {refreshing && <Spinner size={11} />}
+                    </>
+                  ) : undefined
+                }
                 title={`${c.user}@${c.host}:${c.port}/${c.database}${c.readOnly ? ' — read-only' : ''}\nDouble-click to open a console`}
                 onToggle={() => (c.connected ? toggle(connKey, true) : actions.connect(c))}
                 onClick={() => {
@@ -249,8 +268,17 @@ export function DatabaseExplorer({ connections, schemas, selection, onSelect, ac
                 onDoubleClick={() => actions.openConsole(c)}
                 onContextMenu={(e) => showMenu(e, connectionMenu(c))}
               />
-              {connOpen && state?.status === 'loading' && <div className="tree-note" style={{ paddingLeft: 40 }}>Loading…</div>}
-              {connOpen && state?.status === 'error' && <div className="tree-note error" style={{ paddingLeft: 40 }}>{state.message}</div>}
+              {connectError && !phase && !c.connected && (
+                <div className="tree-note error" style={{ paddingLeft: 48 }} data-testid="connect-error">
+                  {connectError} <button className="link" onClick={() => actions.connect(c)}>Retry</button>
+                </div>
+              )}
+              {connOpen && state?.status === 'loading' && <SkeletonTree depth={1} label="Loading schema…" />}
+              {connOpen && state?.status === 'error' && (
+                <div className="tree-note error" style={{ paddingLeft: 48 }}>
+                  {state.message} <button className="link" onClick={() => actions.refreshSchema(c)}>Retry</button>
+                </div>
+              )}
               {connOpen && state?.status === 'ready' && (
                 <DatabaseNode
                   connection={c}

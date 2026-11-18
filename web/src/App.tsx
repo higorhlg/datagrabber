@@ -4,7 +4,7 @@ import type { ConnectionConfig, ConnectionSummary, DatabaseSchema, RelationInfo 
 import { api, ApiError, type PasswordCopyResult } from './api.ts';
 import { PasswordCopyDialog, type PasswordCopyState } from './components/PasswordCopyDialog.tsx';
 import { ConnectionDialog } from './components/ConnectionDialog.tsx';
-import { DatabaseExplorer, type ExplorerSelection, type SchemaState } from './components/DatabaseExplorer.tsx';
+import { DatabaseExplorer, type ConnectionPhase, type ExplorerSelection, type SchemaState } from './components/DatabaseExplorer.tsx';
 import { DdlTab } from './components/DdlTab.tsx';
 import { ImportDialog } from './components/ImportDialog.tsx';
 import { Modal } from './components/Modal.tsx';
@@ -42,6 +42,8 @@ export function App() {
   const [connections, setConnections] = useState<ConnectionSummary[]>([]);
   const [schemas, setSchemas] = useState<Record<string, SchemaState | undefined>>({});
   const [serverVersions, setServerVersions] = useState<Record<string, string>>({});
+  const [phases, setPhases] = useState<Record<string, ConnectionPhase | undefined>>({});
+  const [connectErrors, setConnectErrors] = useState<Record<string, string | undefined>>({});
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeKey, setActiveKey] = useState<string>();
   const [selection, setSelection] = useState<ExplorerSelection>();
@@ -76,7 +78,10 @@ export function App() {
   }, [refresh]);
 
   const loadSchema = useCallback(async (id: string) => {
-    setSchemas((s) => ({ ...s, [id]: s[id]?.status === 'ready' ? s[id] : { status: 'loading' } }));
+    setSchemas((s) => {
+      const current = s[id];
+      return { ...s, [id]: current?.status === 'ready' ? { ...current, refreshing: true } : { status: 'loading' } };
+    });
     try {
       const schema = await api.schema(id);
       setSchemas((s) => ({ ...s, [id]: { status: 'ready', schema } }));
@@ -143,25 +148,32 @@ export function App() {
     (connection: ConnectionConfig): Promise<boolean> => {
       const pending = connecting.current.get(connection.id);
       if (pending) return pending;
+      const setPhase = (phase: ConnectionPhase | undefined) => setPhases((p) => ({ ...p, [connection.id]: phase }));
       const attempt = (async () => {
         let connected = false;
+        setPhase('connecting');
+        setConnectErrors((e) => ({ ...e, [connection.id]: undefined }));
         try {
           const info = await api.connect(connection.id);
           setServerVersions((v) => ({ ...v, [connection.id]: info.serverVersion }));
           connected = true;
         } catch (error) {
           if (error instanceof ApiError && error.needsPassword) {
+            setPhase('password');
             connected = await askPassword(connection, error.message === 'Password required' ? undefined : error.message);
           } else {
-            notify((error as Error).message);
+            setConnectErrors((e) => ({ ...e, [connection.id]: (error as Error).message }));
           }
         }
         if (connected) {
-          await refresh();
           if (!readySchema(schemas[connection.id])) loadSchema(connection.id);
+          await refresh();
         }
         return connected;
-      })().finally(() => connecting.current.delete(connection.id));
+      })().finally(() => {
+        setPhase(undefined);
+        connecting.current.delete(connection.id);
+      });
       connecting.current.set(connection.id, attempt);
       return attempt;
     },
@@ -273,6 +285,8 @@ export function App() {
       <DatabaseExplorer
         connections={connections}
         schemas={schemas}
+        phases={phases}
+        connectErrors={connectErrors}
         selection={selection}
         onSelect={setSelection}
         actions={{

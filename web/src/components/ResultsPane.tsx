@@ -3,6 +3,7 @@ import type { QueryError, QueryResult } from '../../../shared/types.ts';
 import { toCsv, toInsertSql, toJson, toTsv } from '../export.ts';
 import { ContextMenu, type MenuItem } from './ContextMenu.tsx';
 import { Modal } from './Modal.tsx';
+import { LoadingMessage, ProgressBar } from './Loading.tsx';
 import { ResultsGrid } from './ResultsGrid.tsx';
 
 export type ResultTab = {
@@ -20,6 +21,8 @@ type ResultsPaneProps = {
   onSelect: (id: string) => void;
   onSaveFile: (fileName: string, contents: string) => void;
   notify: (message: string) => void;
+  /** Cancels the running statement (shown while a tab is running). */
+  onCancel: () => void;
 };
 
 type ValueView = { name: string; type: string; value: string | null };
@@ -38,7 +41,7 @@ function formatValue(view: ValueView): string {
 }
 
 /** Tabs of statement results with a status line, filter, copy/export menu and value viewer. */
-export function ResultsPane({ tabs, activeId, onSelect, onSaveFile, notify }: ResultsPaneProps) {
+export function ResultsPane({ tabs, activeId, onSelect, onSaveFile, notify, onCancel }: ResultsPaneProps) {
   const [filter, setFilter] = useState('');
   const [selectedValue, setSelectedValue] = useState<{ name?: string; value: string | null | undefined }>();
   const [viewing, setViewing] = useState<ValueView>();
@@ -85,7 +88,13 @@ export function ResultsPane({ tabs, activeId, onSelect, onSaveFile, notify }: Re
           </button>
         ))}
       </div>
-      {active?.status === 'running' && <div className="grid-message">Running…</div>}
+      <ProgressBar active={tabs.some((t) => t.status === 'running')} />
+      {active?.status === 'running' && (
+        <div className="running-state" data-testid="running">
+          <LoadingMessage>Running {active.label.replace(/^\d+: /, '')}</LoadingMessage>
+          <button className="ghost small danger" onClick={onCancel}>Cancel</button>
+        </div>
+      )}
       {active?.status === 'error' && active.error && (
         <div className="query-error" data-testid="query-error">
           <strong>{active.error.code ? `[${active.error.code}] ` : ''}{active.error.message}</strong>

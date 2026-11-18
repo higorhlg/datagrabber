@@ -152,7 +152,7 @@ export function ResultsGrid({ result, filter = '', onSelectValue, onOpenValue, s
         {rows.slice(first, last).map(({ row, index }, offset) => {
           const visual = first + offset;
           return (
-            <div key={visual} className="grid-row" style={{ gridTemplateColumns: template, transform: `translateY(${visual * ROW_HEIGHT}px)` }}>
+            <div key={visual} className="grid-row" style={{ gridTemplateColumns: template, top: visual * ROW_HEIGHT }}>
               <div className="grid-rownum">{index + firstRowNumber}</div>
               {row.map((value, col) => (
                 <div

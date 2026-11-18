@@ -66,6 +66,7 @@ export const api = {
   run: (id: string, sql: string, maxRows: number) => call<RunResponse>('run_query', { id, sql, maxRows }),
   cancel: (id: string) => call<void>('cancel_query', { id }),
   tablePage: (id: string, request: TablePageRequest) => call<TablePageResponse>('table_page', { id, request }),
+  cancelTableQuery: (id: string) => call<void>('cancel_table_query', { id }),
   tableCount: (id: string, schema: string, table: string, filter?: string) => call<number>('table_count', { id, schema, table, filter }),
   objectDdl: (id: string, schema: string, name: string, kind: DdlKind, args?: string) => call<string>('object_ddl', { id, schema, name, kind, arguments: args }),
   savedQueries: (id: string) => call<SavedQuery[]>('list_saved_queries', { id }),

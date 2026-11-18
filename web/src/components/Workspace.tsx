@@ -8,6 +8,7 @@ import { setModelSchema } from '../completion.ts';
 import { monaco } from '../monaco-setup.ts';
 import { useEditorTheme } from '../theme.ts';
 import { Play, ListVideo, Square, Star, History as HistoryIcon } from 'lucide-react';
+import { LoadingMessage } from './Loading.tsx';
 import { QueryLibrary } from './QueryLibrary.tsx';
 import { ResultsPane, type ResultTab } from './ResultsPane.tsx';
 
@@ -277,7 +278,7 @@ export function Workspace({ connection, schema, visible, request, ensureConnecte
         <button className="tool danger" onClick={cancel} disabled={!running} title="Cancel the running statement" data-testid="cancel"><Square size={14} fill="currentColor" /></button>
         <span className="tool-sep" />
         <button className="tool" onClick={saveCurrent} title="Save the current statement to this database's saved queries" data-testid="save-query"><Star size={15} /></button>
-        {running && <span className="muted small mono">{(elapsed / 1000).toFixed(1)}s</span>}
+        {running && <span className="running-chip"><span className="spinner" /> <span className="mono">{(elapsed / 1000).toFixed(1)}s</span></span>}
         <span className="spacer" />
         <label className="small muted max-rows">
           Max rows
@@ -295,6 +296,7 @@ export function Workspace({ connection, schema, visible, request, ensureConnecte
       <div className="workspace-body">
         <div className="editor-and-results">
           <div className="editor" style={{ height: `${editorHeight}%` }}>
+            {initialText === undefined && <LoadingMessage>Opening console…</LoadingMessage>}
             {initialText !== undefined && (
               <Editor
                 path={`console-${connection.id}.sql`}
@@ -308,7 +310,7 @@ export function Workspace({ connection, schema, visible, request, ensureConnecte
             )}
           </div>
           <div className="splitter" onMouseDown={startResize} role="separator" aria-orientation="horizontal" />
-          <ResultsPane tabs={tabs} activeId={activeTab} onSelect={setActiveTab} onSaveFile={onSaveFile} notify={notify} />
+          <ResultsPane tabs={tabs} activeId={activeTab} onSelect={setActiveTab} onSaveFile={onSaveFile} notify={notify} onCancel={cancel} />
         </div>
         {showLibrary && (
           <QueryLibrary
