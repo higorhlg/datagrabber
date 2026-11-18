@@ -10,6 +10,7 @@ import { parseArgs } from 'node:util';
  *   pnpm e2e --scenario sample [--home <dir>] [--screenshot out.png]
  *   pnpm e2e --scenario import [--expected 8] [--add-sample]
  *   pnpm e2e --scenario passwords --home <dir>   (fake DataGrip project + fake DataGrip Keychain items)
+ *   pnpm e2e --scenario loading --home <dir>     (needs pnpm real-db running: loading states and Stop)
  *
  * Builds a debug app (frontend embedded), starts the PGlite sample DB if it isn't running,
  * launches the app with DATAGRABBER_E2E set and exits with the self-test's status.
@@ -91,6 +92,10 @@ function fakeDatagripProject(dir: string): [string, string, string][] {
 }
 
 const env: NodeJS.ProcessEnv = { ...process.env, DATAGRABBER_E2E: '', DATAGRABBER_SECRETS: 'memory' };
+if (values.scenario === 'loading') {
+  if (!(await isListening(54330))) throw new Error('--scenario loading needs `pnpm real-db` running on :54330');
+  Object.assign(config, { realPort: 54330, realPassword: 'it-password' });
+}
 if (values.scenario === 'passwords') {
   if (!values.home) throw new Error('--scenario passwords needs --home');
   const datagripDir = join(values.home, 'fake-datagrip');
@@ -102,9 +107,21 @@ if (values.home) env.DATAGRABBER_HOME = values.home;
 
 const app = spawn(binary, [], { env, stdio: ['ignore', 'pipe', 'inherit'] });
 let output = '';
+/** Screenshots requested mid-test with snap(label) land next to --screenshot as <name>-<label>.png. */
+function captureSnapshots(text: string): void {
+  if (!values.screenshot) return;
+  for (const [, label] of text.matchAll(/\[e2e\] snap:([\w-]+)/g)) {
+    const id = app.pid ? windowId(app.pid) : undefined;
+    const file = values.screenshot.replace(/\.png$/, `-${label}.png`);
+    spawnSync('screencapture', id ? ['-x', '-o', `-l${id}`, file] : ['-x', file]);
+    console.log(`[e2e] snapshot saved to ${file}`);
+  }
+}
+
 app.stdout.on('data', (chunk: Buffer) => {
   output += chunk;
   process.stdout.write(chunk);
+  captureSnapshots(chunk.toString());
 });
 
 const timeout = setTimeout(() => {

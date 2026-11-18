@@ -14,17 +14,17 @@ import { monaco } from './monaco-setup.ts';
  * - "import": import every DataGrip data source through the import dialog, check prod ones are
  *   read-only, and check a connection asks for its password without contacting the server.
  */
-type SelfTestConfig = { scenario: 'sample' | 'import' | 'passwords'; samplePort?: number; expectedImports?: number; holdMs?: number; addSample?: boolean; datagripDir?: string };
+type SelfTestConfig = { scenario: 'sample' | 'import' | 'passwords' | 'loading'; realPort?: number; realPassword?: string; samplePort?: number; expectedImports?: number; holdMs?: number; addSample?: boolean; datagripDir?: string };
 
 const SAMPLE_NAME = 'Sample shop (PGlite)';
 const log: string[] = [];
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Polls until `find` returns a truthy value, failing with `what` after the timeout. */
-async function waitFor<T>(what: string, find: () => T | null | undefined | false, timeoutMs = 10_000): Promise<T> {
+async function waitFor<T>(what: string, find: () => T | null | undefined | false | Promise<T | null | undefined | false>, timeoutMs = 10_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const found = find();
+    const found = await find();
     if (found) return found;
     await sleep(50);
   }
@@ -33,7 +33,7 @@ async function waitFor<T>(what: string, find: () => T | null | undefined | false
 
 const all = <T extends Element = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
 /** Elements currently rendered on screen (hidden tabs excluded). */
-const visibleAll = (selector: string) => all(selector).filter((el) => el.offsetParent !== null);
+const visibleAll = <T extends Element = HTMLElement>(selector: string) => all<T>(selector).filter((el) => (el as unknown as HTMLElement).offsetParent !== null);
 const byText = (selector: string, text: string | RegExp) =>
   all(selector).find((el) => (typeof text === 'string' ? el.textContent?.trim() === text : text.test(el.textContent ?? '')));
 
@@ -67,6 +67,12 @@ function visibleCells(column: string): string[] {
   if (!view) return [];
   const index = visibleAll('.grid-head-cell .col-name').filter((h) => view.contains(h)).findIndex((h) => h.textContent === column);
   return [...view.querySelectorAll('.grid-row')].map((r) => r.querySelectorAll('.grid-cell')[index]?.textContent ?? '');
+}
+
+/** Asks the runner to screenshot the window now (with --screenshot), pausing so the capture lands. */
+async function snap(label: string): Promise<void> {
+  await api.e2eLog(`snap:${label}`);
+  await sleep(1500);
 }
 
 async function step(name: string, body: () => Promise<void>): Promise<void> {
@@ -312,6 +318,109 @@ async function passwordsScenario(config: SelfTestConfig): Promise<void> {
   });
 }
 
+/**
+ * Records which of the given selectors appear in the DOM at any moment (even briefly), so fast
+ * loading states can be asserted after the fact.
+ */
+function watchAppearances(selectors: string[]): { seen: Set<string>; stop: () => void } {
+  const seen = new Set<string>();
+  const check = () => selectors.forEach((selector) => document.querySelector(selector) && seen.add(selector));
+  const observer = new MutationObserver(check);
+  observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+  check();
+  return { seen, stop: () => observer.disconnect() };
+}
+
+/** Asserts that every watched selector showed up. */
+function expectSeen(watch: { seen: Set<string> }, selectors: string[], what: string): void {
+  const missing = selectors.filter((s) => !watch.seen.has(s));
+  if (missing.length) throw new Error(`${what}: never saw ${missing.join(', ')}`);
+}
+
+/**
+ * Loading states against a real PostgreSQL (pnpm real-db): connecting spinner, schema skeleton,
+ * table skeleton, dimmed reload with progress bar, and Stop on a deliberately slow page.
+ */
+async function loadingScenario(config: SelfTestConfig): Promise<void> {
+  const name = 'Real Postgres (loading test)';
+  await step('create a connection to the real database', async () => {
+    document.querySelector<HTMLButtonElement>('button[title="New connection"]')!.click();
+    await waitFor('connection form', () => document.querySelector('#connection-form'));
+    typeInto(field('Name'), name);
+    typeInto(field('Host'), '127.0.0.1');
+    typeInto(field('Port'), String(config.realPort));
+    typeInto(field('Database'), 'postgres');
+    typeInto(field('User'), 'postgres');
+    typeInto(field('Password'), config.realPassword ?? '');
+    byText('button', 'Save')!.click();
+    await waitFor('connection in explorer', () => treeRow(name));
+  });
+
+  await step('connecting shows a spinner, then the schema skeleton, then the tree', async () => {
+    const watch = watchAppearances(['.phase-label', '.skeleton-tree']);
+    treeRow(name)!.click();
+    await waitFor('connected', async () => (await api.listConnections()).find((c) => c.name === name)?.connected, 15_000);
+    await waitFor('database node', () => treeRow('postgres'), 15_000);
+    watch.stop();
+    expectSeen(watch, ['.phase-label', '.skeleton-tree'], 'connecting');
+  });
+
+  await step('create a demo table from a console and refresh the explorer', async () => {
+    treeRow(name)!.closest('.tree-row')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    const editor = await waitFor('console editor', () => visibleEditor());
+    editor.setValue(
+      'drop view if exists slow_demo;\ndrop table if exists loading_demo;\ncreate table loading_demo as select g as id, md5(g::text) as label, now() as created_at from generate_series(1, 2000) g;\ncreate view slow_demo as select d.*, pg_sleep(0.008) is not null as slept from loading_demo d;',
+    );
+    document.querySelector<HTMLButtonElement>('[data-testid=run-all]')!.click();
+    await waitFor('table created', () => all('.results-tab').length === 4 && !document.querySelector('.results-tab.running'));
+    await waitFor('demo table in explorer', () => treeRow('loading_demo'), 15_000);
+  });
+
+  await step('opening a table shows a skeleton grid with its real columns first', async () => {
+    const watch = watchAppearances(['[data-testid=skeleton-grid]', '.progress-bar.active']);
+    treeRow('loading_demo')!.click();
+    await waitFor('first page', () => pageRange() === '1–500');
+    watch.stop();
+    expectSeen(watch, ['[data-testid=skeleton-grid]', '.progress-bar.active'], 'first load');
+  });
+
+  await step('paging keeps the old rows dimmed under a progress bar instead of blanking', async () => {
+    const watch = watchAppearances(['.grid-holder.dimmed', '.progress-bar.active']);
+    document.querySelector<HTMLButtonElement>('[data-testid=next-page]')!.click();
+    await waitFor('second page', () => pageRange() === '501–1,000');
+    watch.stop();
+    expectSeen(watch, ['.grid-holder.dimmed', '.progress-bar.active'], 'paging');
+    if (visibleAll('[data-testid=skeleton-grid]').length) throw new Error('paging should not fall back to the skeleton');
+  });
+
+  await step('Stop cancels a slow page and keeps the previous rows', async () => {
+    const filter = visibleAll<HTMLInputElement>('[data-testid=filter-input]')[0] as HTMLInputElement;
+    typeInto(filter, 'pg_sleep(20) is not null');
+    filter.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const stopButton = await waitFor('stop button', () => visibleAll<HTMLButtonElement>('[data-testid=stop-loading]')[0]);
+    await snap('reloading-dimmed');
+    const started = performance.now();
+    (stopButton as HTMLButtonElement).click();
+    await waitFor('stopped banner', () => visibleAll('[data-testid=stopped-banner]')[0], 5_000);
+    log.push(`     stopped after ${Math.round(performance.now() - started)} ms; previous rows kept: ${visibleCells('id').length}`);
+    if (visibleCells('id').length === 0) throw new Error('previous rows should stay visible');
+    visibleAll<HTMLButtonElement>('button[title="Clear filter"]')[0]?.click();
+    await waitFor('rows again', () => pageRange() === '1–500');
+  });
+
+  await step('a slow first load shows the skeleton grid with the real column names', async () => {
+    document.querySelector<HTMLButtonElement>('[data-testid=toggle-all-kinds]')!.click();
+    await waitFor('slow view in explorer', () => treeRow('slow_demo'));
+    treeRow('slow_demo')!.click();
+    const skeleton = await waitFor('skeleton grid', () => visibleAll('[data-testid=skeleton-grid]')[0]);
+    const headers = [...skeleton.querySelectorAll('.col-name')].map((h) => h.textContent).join(',');
+    if (headers !== 'id,label,created_at,slept') throw new Error(`skeleton headers should be the view's columns, got ${headers}`);
+    await snap('first-load-skeleton');
+    await waitFor('slow view loaded', () => pageRange() === '1–500', 15_000);
+    document.querySelector<HTMLButtonElement>('[data-testid=toggle-all-kinds]')!.click();
+  });
+}
+
 /** UI preferences kept in localStorage, which the installed app shares (same app identifier). */
 const PREFERENCE_KEYS = ['datagrabber.explorer.showAllKinds', 'datagrabber.console.libraryOpen'];
 
@@ -335,6 +444,7 @@ export async function runSelfTestIfRequested(): Promise<void> {
     await sleep(300);
     if (config.scenario === 'sample') await sampleScenario(config);
     else if (config.scenario === 'passwords') await passwordsScenario(config);
+    else if (config.scenario === 'loading') await loadingScenario(config);
     else await importScenario(config);
   } catch (error) {
     ok = false;

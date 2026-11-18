@@ -23,7 +23,11 @@ A personal PostgreSQL desktop client (Tauri: Rust backend, React + Monaco UI).
 - **Table tabs**: click a table to open `name [connection]` with WHERE / ORDER BY bars, header-click
   sorting, paging, "count all", copy/export and a DDL view. Table tabs and the explorer use their own
   connection with `lock_timeout = 5s` and `statement_timeout = 30s`, so opening a table never hangs
-  behind a migration's lock or runs for minutes; consoles have no time limit and can be cancelled.
+  behind a migration's lock or runs for minutes; ■ Stop cancels a slow page sooner. Consoles have no
+  time limit and can be cancelled.
+- **Loading states**: connections show a spinner (or "waiting for password…") and errors with Retry;
+  schemas load behind skeleton rows; a table's first page shows its real columns over a skeleton
+  grid; paging, sorting and filtering keep the previous rows (faded) under a progress bar.
 - **History and saved queries per database** (`history.json`, `saved_queries.json`): every run is
   listed in the console's History panel; ★ saves a query under a name, and saved queries run with one click.
 
@@ -52,6 +56,8 @@ pnpm real-db               # real PostgreSQL (embedded binaries) on :54330, in a
 pnpm test                  # SQL splitter/alias tests + Rust unit and integration tests
                            # (integration tests need DATAGRABBER_TEST_PG=54330 in the environment)
 pnpm e2e --scenario sample --home /tmp/dg-e2e    # drives the real app window against the sample DB
+pnpm e2e --scenario loading --home /tmp/dg-load  # loading states and Stop against `pnpm real-db`
+pnpm e2e --scenario passwords --home /tmp/dg-pw  # DataGrip password copy with fake Keychain items
 ```
 
 `pnpm e2e` builds a debug app and runs `web/src/selftest.ts` inside it (clicks, typing, editor
