@@ -12,6 +12,7 @@ use crate::model::{
 };
 use crate::query::TablePageRequest;
 use crate::session::Sessions;
+use crate::password_import::{self, PasswordCopyResult};
 use crate::{connections, datagrip, ddl, history, introspect, query, saved, secrets, store};
 
 const DEFAULT_MAX_ROWS: usize = 500;
@@ -257,6 +258,28 @@ pub fn save_export(file_name: String, contents: String) -> CommandResult<String>
     }
     std::fs::write(&path, contents)?;
     Ok(path.display().to_string())
+}
+
+/// Copies passwords DataGrip saved in the macOS Keychain into this app's keychain entries.
+/// With `ids`, only those connections (replacing saved passwords); without, every imported
+/// connection that has no saved password yet. Runs off the main thread because macOS may show an
+/// access prompt for each DataGrip item and wait for the user.
+#[tauri::command]
+pub async fn copy_datagrip_passwords(ids: Option<Vec<String>>) -> CommandResult<Vec<PasswordCopyResult>> {
+    tokio::task::spawn_blocking(move || {
+        let all = connections::list()?;
+        let explicit = ids.is_some();
+        let chosen: Vec<ConnectionConfig> = match &ids {
+            Some(ids) => all.into_iter().filter(|c| ids.contains(&c.id)).collect(),
+            None => all.into_iter().filter(|c| c.datagrip_uuid.is_some()).collect(),
+        };
+        Ok(password_import::copy_passwords(&chosen, explicit, secrets::read_external, |connection, password| {
+            secrets::set(&connection.id, password)?;
+            connections::set_password_saved(&connection.id, true)
+        }))
+    })
+    .await
+    .map_err(|e| CommandError::new(e.to_string()))?
 }
 
 /// UI self-test configuration, present only when the app is launched with DATAGRABBER_E2E set.

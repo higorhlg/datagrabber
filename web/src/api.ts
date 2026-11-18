@@ -45,6 +45,13 @@ export type PasswordChoice = { password?: string; savePassword?: boolean };
 export type RunResponse = { ok: true; result: QueryResult } | { ok: false; error: QueryError };
 export type TablePageResponse = { ok: true; result: QueryResult; sql: string } | { ok: false; error: QueryError; sql: string };
 export type DdlKind = 'relation' | 'sequence' | 'routine';
+/** Outcome of copying one connection's password from DataGrip (the password itself is never returned). */
+export type PasswordCopyResult = {
+  id: string;
+  name: string;
+  status: 'copied' | 'already-saved' | 'not-found' | 'not-imported' | 'unavailable' | 'error';
+  message?: string | null;
+};
 
 export const api = {
   listConnections: () => call<ConnectionSummary[]>('list_connections'),
@@ -70,6 +77,7 @@ export const api = {
   saveConsole: (id: string, text: string) => call<void>('save_console', { id, text }),
   previewDatagrip: (dir?: string) => call<{ dir: string; candidates: DatagripCandidate[] }>('preview_datagrip', { dir }),
   importDatagrip: (uuids: string[], dir?: string) => call<ConnectionConfig[]>('import_datagrip', { uuids, dir }),
+  copyDatagripPasswords: (ids?: string[]) => call<PasswordCopyResult[]>('copy_datagrip_passwords', { ids }),
   saveExport: (fileName: string, contents: string) => call<string>('save_export', { fileName, contents }),
   e2eConfig: () => call<Record<string, unknown> | null>('e2e_config'),
   e2eLog: (line: string) => call<void>('e2e_log', { line }),

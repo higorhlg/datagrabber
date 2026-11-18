@@ -6,6 +6,7 @@ mod error;
 mod history;
 mod introspect;
 mod model;
+mod password_import;
 mod query;
 mod saved;
 mod secrets;
@@ -45,6 +46,7 @@ pub fn run() {
             commands::save_console,
             commands::preview_datagrip,
             commands::import_datagrip,
+            commands::copy_datagrip_passwords,
             commands::save_export,
             commands::e2e_config,
             commands::e2e_log,

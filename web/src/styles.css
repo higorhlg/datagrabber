@@ -327,3 +327,8 @@ button.tool.starred { color: var(--ic-key); }
 .explorer-toolbar button.tool { width: 26px; height: 26px; }
 .explorer-toolbar button.tool.text { width: auto; }
 .explorer-toolbar .tool-sep { margin: 0 2px; }
+.copy-explainer p { margin: 0 0 8px; line-height: 1.5; }
+.copy-explainer ul, .copy-results { margin: 0; padding-left: 18px; line-height: 1.6; }
+.copy-results { list-style: none; padding: 0; }
+.copy-results li { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.ok-icon { color: var(--ok); }

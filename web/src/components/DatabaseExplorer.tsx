@@ -23,6 +23,7 @@ import {
   Download,
   ListTree,
   Info,
+  KeySquare,
 } from 'lucide-react';
 import type { ConnectionSummary, DatabaseSchema, RelationInfo, RoutineInfo, SchemaInfo } from '../../../shared/types.ts';
 import { quoteIdent } from '../completion.ts';
@@ -47,6 +48,8 @@ export type ExplorerActions = {
   remove: (connection: ConnectionSummary) => void;
   newConnection: () => void;
   importDatagrip: () => void;
+  /** Copies DataGrip's saved passwords; with a connection, only that one. */
+  copyDatagripPasswords: (connection?: ConnectionSummary) => void;
   notify: (message: string) => void;
 };
 
@@ -165,6 +168,7 @@ export function DatabaseExplorer({ connections, schemas, selection, onSelect, ac
     c.connected ? { label: 'Refresh schema', onSelect: () => actions.refreshSchema(c) } : { label: 'Connect', onSelect: () => actions.connect(c) },
     { label: 'Edit connection…', onSelect: () => actions.edit(c) },
     { label: 'Disconnect', onSelect: () => actions.disconnect(c), disabled: !c.connected },
+    ...(c.datagripUuid ? [{ label: 'Copy password from DataGrip', onSelect: () => actions.copyDatagripPasswords(c) }] : []),
     { label: 'Forget saved password', onSelect: () => actions.forgetPassword(c), disabled: !c.passwordSaved },
     { label: 'Delete connection…', onSelect: () => actions.remove(c), danger: true },
   ];
@@ -199,6 +203,7 @@ export function DatabaseExplorer({ connections, schemas, selection, onSelect, ac
       <div className="explorer-toolbar" role="toolbar">
         <button className="tool" title="New connection" onClick={actions.newConnection}><Plus size={16} /></button>
         <button className="tool" title="Import from DataGrip" onClick={actions.importDatagrip}><Download size={16} /></button>
+        <button className="tool" title="Copy passwords saved in DataGrip" onClick={() => actions.copyDatagripPasswords()} data-testid="copy-passwords"><KeySquare size={16} /></button>
         <span className="tool-sep" />
         <button className="tool" title="Refresh schema" disabled={!toolbarConnection?.connected} onClick={() => toolbarConnection && actions.refreshSchema(toolbarConnection)}><RefreshCw size={16} /></button>
         <button className="tool" title="Disconnect" disabled={!toolbarConnection?.connected} onClick={() => toolbarConnection && actions.disconnect(toolbarConnection)}><Unplug size={16} /></button>

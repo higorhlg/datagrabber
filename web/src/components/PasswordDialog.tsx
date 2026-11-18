@@ -6,11 +6,13 @@ type PasswordDialogProps = {
   connection: ConnectionConfig;
   error?: string;
   onSubmit: (password: string, savePassword: boolean) => void;
+  /** Shown for DataGrip imports: copy DataGrip's saved password from the Keychain, then connect. */
+  onUseDatagrip?: () => void;
   onCancel: () => void;
 };
 
 /** Asks for a connection's password at connect time, optionally saving it to the keychain. */
-export function PasswordDialog({ connection, error, onSubmit, onCancel }: PasswordDialogProps) {
+export function PasswordDialog({ connection, error, onSubmit, onUseDatagrip, onCancel }: PasswordDialogProps) {
   const [password, setPassword] = useState('');
   const [save, setSave] = useState(true);
   const submit = (event: FormEvent) => {
@@ -33,6 +35,12 @@ export function PasswordDialog({ connection, error, onSubmit, onCancel }: Passwo
         <p className="span-2 muted mono">{connection.user}@{connection.host}:{connection.port}/{connection.database}</p>
         <label className="span-2">Password<input autoFocus type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" /></label>
         <label className="check span-2"><input type="checkbox" checked={save} onChange={(e) => setSave(e.target.checked)} />Save in macOS Keychain</label>
+        {onUseDatagrip && (
+          <p className="span-2 small">
+            <button type="button" className="link" onClick={onUseDatagrip} data-testid="use-datagrip-password">Use the password saved in DataGrip</button>
+            <span className="muted"> — macOS will ask you to allow access.</span>
+          </p>
+        )}
       </form>
       {error && <p className="status error">{error}</p>}
     </Modal>

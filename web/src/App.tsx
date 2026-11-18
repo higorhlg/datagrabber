@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { ChevronRight, FileCode2, SquareTerminal, Table2, Eye, X } from 'lucide-react';
 import type { ConnectionConfig, ConnectionSummary, DatabaseSchema, RelationInfo } from '../../shared/types.ts';
-import { api, ApiError } from './api.ts';
+import { api, ApiError, type PasswordCopyResult } from './api.ts';
+import { PasswordCopyDialog, type PasswordCopyState } from './components/PasswordCopyDialog.tsx';
 import { ConnectionDialog } from './components/ConnectionDialog.tsx';
 import { DatabaseExplorer, type ExplorerSelection, type SchemaState } from './components/DatabaseExplorer.tsx';
 import { DdlTab } from './components/DdlTab.tsx';
@@ -50,6 +51,7 @@ export function App() {
   const [confirmDelete, setConfirmDelete] = useState<ConnectionSummary>();
   const [prompt, setPrompt] = useState<PasswordPrompt>();
   const [properties, setProperties] = useState<Properties>();
+  const [passwordCopy, setPasswordCopy] = useState<PasswordCopyState>();
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [explorerWidth, setExplorerWidth] = useState(330);
   const connecting = useRef(new Map<string, Promise<boolean>>());
@@ -95,6 +97,41 @@ export function App() {
       setPrompt(undefined);
     } catch (error) {
       setPrompt({ ...prompt, error: (error as Error).message });
+    }
+  };
+
+  /** Copies DataGrip's Keychain passwords (all imported connections, or the given ones). */
+  const runPasswordCopy = async (ids?: string[]): Promise<PasswordCopyResult[]> => {
+    setPasswordCopy({ phase: 'running' });
+    try {
+      const results = await api.copyDatagripPasswords(ids);
+      setPasswordCopy({ phase: 'done', results });
+      await refresh();
+      return results;
+    } catch (error) {
+      setPasswordCopy(undefined);
+      notify((error as Error).message);
+      return [];
+    }
+  };
+
+  /** "Use the password saved in DataGrip" in the password prompt: copy it, then connect with it. */
+  const useDatagripPassword = async () => {
+    if (!prompt) return;
+    const current = prompt;
+    const [result] = await runPasswordCopy([current.connection.id]);
+    setPasswordCopy(undefined);
+    if (result?.status !== 'copied') {
+      setPrompt({ ...current, error: result?.message ?? 'DataGrip has no saved password for this connection.' });
+      return;
+    }
+    try {
+      const info = await api.connect(current.connection.id);
+      setServerVersions((v) => ({ ...v, [current.connection.id]: info.serverVersion }));
+      current.resolve(true);
+      setPrompt(undefined);
+    } catch (error) {
+      setPrompt({ ...current, error: (error as Error).message });
     }
   };
 
@@ -256,6 +293,7 @@ export function App() {
           remove: setConfirmDelete,
           newConnection: () => setEditing({}),
           importDatagrip: () => setImporting(true),
+          copyDatagripPasswords: (connection) => (connection ? runPasswordCopy([connection.id]) : setPasswordCopy({ phase: 'confirm' })),
           notify,
         }}
       />
@@ -396,10 +434,19 @@ export function App() {
           connection={prompt.connection}
           error={prompt.error}
           onSubmit={submitPassword}
+          onUseDatagrip={prompt.connection.datagripUuid ? useDatagripPassword : undefined}
           onCancel={() => {
             prompt.resolve(false);
             setPrompt(undefined);
           }}
+        />
+      )}
+      {passwordCopy && !prompt && (
+        <PasswordCopyDialog
+          state={passwordCopy}
+          pendingCount={connections.filter((c) => c.datagripUuid && !c.passwordSaved).length}
+          onStart={() => runPasswordCopy()}
+          onClose={() => setPasswordCopy(undefined)}
         />
       )}
       {confirmDelete && (
