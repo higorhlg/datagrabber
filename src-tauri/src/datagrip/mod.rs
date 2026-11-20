@@ -1,6 +1,6 @@
 //! DataGrip interoperability: importing data sources from a project's .idea/dataSources.xml +
 //! dataSources.local.xml (connection metadata only), and copying the passwords DataGrip saved in
-//! the macOS Keychain (`passwords`, which asks the user to allow each item).
+//! the OS keychain (`passwords`, which asks the user to allow or unlock each item).
 
 pub mod passwords;
 

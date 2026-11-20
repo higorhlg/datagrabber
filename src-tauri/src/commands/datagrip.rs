@@ -54,7 +54,7 @@ pub fn import_datagrip(uuids: Vec<String>, dir: Option<String>, sessions: State<
     Ok(imported)
 }
 
-/// Copies passwords DataGrip saved in the macOS Keychain into this app's keychain entries.
+/// Copies passwords DataGrip saved in the OS keychain into this app's keychain entries.
 /// With `ids`, only those connections (replacing saved passwords); without, every imported
 /// connection that has no saved password yet. Runs off the main thread because macOS may show an
 /// access prompt for each DataGrip item and wait for the user.
