@@ -5,14 +5,14 @@
 <h1 align="center">Datagrabber</h1>
 
 <p align="center">
-  A fast, safe PostgreSQL desktop client for macOS. Rust + Tauri, React + Monaco.<br />
-  Explorer, table tabs and SQL consoles — designed so browsing production never hangs, never commits behind your back, and never touches your passwords outside the Keychain.
+  A fast, safe PostgreSQL desktop client for macOS and Linux. Rust + Tauri, React + Monaco.<br />
+  Explorer, table tabs and SQL consoles — designed so browsing production never hangs, never commits behind your back, and never keeps passwords outside the OS keychain.
 </p>
 
 <p align="center">
   <a href="https://github.com/higorhlg/datagrabber/actions/workflows/ci.yml"><img src="https://github.com/higorhlg/datagrabber/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="Apache-2.0" /></a>
-  <img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="macOS" />
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey" alt="macOS | Linux" />
 </p>
 
 ![A table tab with WHERE / ORDER BY bars, header sorting and a row count](docs/media/table-tab.png)
@@ -25,14 +25,14 @@
 - **Table tabs** — click a table to open it: WHERE and ORDER BY bars, click-to-sort headers, paging,
   `count(*)` on demand, copy/export (TSV, CSV, JSON, INSERT) and its DDL.
 - **SQL consoles** — Monaco editor with schema-aware autocomplete (including table aliases),
-  ⌘↵ runs the statement under the cursor, ⇧⌘↵ runs everything, errors are marked where PostgreSQL
+  ⌘↵ / Ctrl+Enter runs the statement under the cursor, ⇧⌘↵ / Ctrl+Shift+Enter runs everything, errors are marked where PostgreSQL
   points, ■ cancels on the server.
 - **History and saved queries per database** — every run is recorded; ★ keeps the good ones, one
   click reruns them.
 - **Clear loading states** — connecting spinners, schema skeletons, a skeleton grid with the real
   column names, previous rows kept (faded) while the next page loads, and a Stop button.
 - **DataGrip import** — brings in your DataGrip data sources (`~/DataGripProjects/.idea`), and can
-  copy the passwords DataGrip saved in the macOS Keychain — with your approval for each one.
+  copy the passwords DataGrip saved in the OS keychain — with your approval for each one.
 
 <table>
   <tr>
@@ -55,24 +55,33 @@ Database GUIs make it easy to hurt production by accident. Datagrabber's default
 | Clicking a table queues behind a migration's lock | The explorer and table tabs run on their own connection with `lock_timeout = 5s` and `statement_timeout = 30s`; you get a clear message, never a hang. |
 | A tool quietly commits your open transaction | Inside a `BEGIN` you opened, the cursor joins your transaction; it never wraps it in its own `COMMIT`. |
 | Writing to prod by mistake | Connections can be read-only (every session starts with read-only transactions). Imported names containing "prod" start read-only, and prod connections are red. |
-| Passwords in config files | Passwords live only in the macOS Keychain. Connections, consoles and history are plain JSON files in `~/.datagrabber`, owner-only. |
+| Passwords in config files | Passwords live only in the OS keychain (macOS Keychain; Secret Service — GNOME Keyring or KWallet — on Linux). Connections, consoles and history are plain JSON files in `~/.datagrabber`, owner-only. |
 | Websites talking to a local server | There is no local server: the UI calls Rust directly through Tauri IPC. |
 
 Read-only mode is a guard rail, not a permission boundary — use a read-only database role for real enforcement.
 
 ## Install
 
-**From source** (macOS, Node 24+, pnpm 10, Rust stable):
+**From source** (Node 24+, pnpm 10, Rust stable):
 
 ```sh
 git clone https://github.com/higorhlg/datagrabber.git
 cd datagrabber
 pnpm install
-pnpm build          # → src-tauri/target/release/bundle/macos/Datagrabber.app
+pnpm build          # macOS → src-tauri/target/release/bundle/macos/Datagrabber.app
+                    # Linux → src-tauri/target/release/bundle/{deb,rpm,appimage}/
 ```
 
-**Prebuilt:** pushing a `v*` tag builds a universal (Apple Silicon + Intel) `.dmg` and attaches it to a
-GitHub release; check the Releases page. It is not notarized yet; on first launch right-click the app → Open.
+On Linux, install the WebKitGTK and D-Bus development packages first, e.g. on Debian/Ubuntu:
+
+```sh
+sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev libssl-dev pkg-config patchelf
+```
+
+**Prebuilt:** pushing a `v*` tag builds a universal macOS `.dmg` (Apple Silicon + Intel) and Linux
+`.deb`, `.rpm` and `.AppImage` packages, attached to a GitHub release; check the Releases page. The
+macOS app is not notarized yet: on first launch right-click it → Open. Linux needs WebKitGTK 4.1
+(2.40 or newer recommended: Ubuntu 24.04+, Fedora 39+) and a Secret Service keyring.
 
 Want a database to try it on? `pnpm sample-db` serves a fake shop on `127.0.0.1:54329` (in-memory
 PGlite, any user/password).
@@ -94,7 +103,7 @@ flowchart LR
     db -- "console connection (your SQL)" --> PG[(PostgreSQL)]
     db -- "meta connection (explorer, tables; timeouts)" --> PG
     storage --> files[~/.datagrabber JSON]
-    storage --> keychain[macOS Keychain]
+    storage --> keychain[OS keychain]
   end
 ```
 
@@ -102,8 +111,8 @@ flowchart LR
 | --- | --- |
 | `src-tauri/src/commands/` | The UI's API: thin Tauri commands per area (connections, queries, explorer, library, DataGrip) |
 | `src-tauri/src/db/` | Sessions (TLS, read-only, timeouts, cancel), cursor-capped execution, introspection, DDL |
-| `src-tauri/src/storage/` | Connections, consoles, history, saved queries (atomic, owner-only JSON) and Keychain secrets |
-| `src-tauri/src/datagrip/` | DataGrip import and Keychain password copy |
+| `src-tauri/src/storage/` | Connections, consoles, history, saved queries (atomic, owner-only JSON) and keychain secrets |
+| `src-tauri/src/datagrip/` | DataGrip import and keychain password copy |
 | `web/src/app/` | App shell: connection state, tabs, status bar |
 | `web/src/features/` | Explorer, table tabs, consoles, connection dialogs |
 | `web/src/ui/` | Shared components: results grid, dialogs, loading states |
@@ -130,12 +139,14 @@ read-only, server-side cancel, giving up on a locked table within 5 s, introspec
 
 `pnpm e2e --scenario sample|loading|passwords|import --home /tmp/dg` builds the app and drives the
 real window through an in-app self-test (connect, browse, table tabs, consoles, saved queries,
-loading states, DataGrip import) — it opens an app window while it runs.
+loading states, DataGrip import) — it opens an app window while it runs (macOS only).
 
 ## Status
 
-Built for PostgreSQL on macOS. Not yet: editing rows in the grid, ER diagrams, schema compare,
-other databases, Windows/Linux builds (Tauri supports them; untested).
+Built for PostgreSQL. macOS is the primary platform. Linux builds and passes the full test suite in
+CI (including the real-PostgreSQL integration tests), but the UI has had less hands-on use there —
+issues welcome. Not yet: editing rows in the grid, ER diagrams, schema compare, other databases,
+Windows.
 
 Datagrabber is an independent project and is not affiliated with JetBrains. DataGrip is a trademark
 of JetBrains s.r.o.; it is mentioned only to describe import compatibility.
