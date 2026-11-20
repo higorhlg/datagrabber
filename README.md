@@ -1,74 +1,145 @@
-# Datagrabber
+<p align="center">
+  <img src="docs/brand/icon.png" width="112" alt="Datagrabber icon" />
+</p>
 
-A personal PostgreSQL desktop client (Tauri: Rust backend, React + Monaco UI).
+<h1 align="center">Datagrabber</h1>
 
-- **Connections** saved in `~/.datagrabber/connections.json`, passwords in the macOS Keychain
-  (service `datagrabber`), colored by environment, optional **read-only** mode
-  (`set session characteristics as transaction read only` on every connection the app opens).
-- **Import from DataGrip** (`~/DataGripProjects/.idea` by default): host, port, database and user.
-  DataGrip keeps passwords in its own encrypted store, so each connection asks once on first connect.
-  Names containing "prod" start read-only. Re-importing updates connections instead of duplicating them.
-- **Console per connection** (persisted in `~/.datagrabber/consoles/`): ⌘↵ runs the statement at the
-  cursor or the selection, ⇧⌘↵ runs everything, Cancel sends a real `pg_cancel` to the server.
-  Errors are marked in the editor at the position PostgreSQL reports.
-- **Autocomplete** for schemas, tables and columns, including through aliases (`o.` after `from orders o`).
-- **Results grid**: virtualized, sortable, filterable, NULL-aware, value viewer (pretty JSON),
-  copy as TSV/CSV/JSON/INSERT, save CSV/JSON to Downloads. Row cap per run (default 500): queries
-  go through a server-side cursor, so `select * from huge_table` stops at the cap. Inside a
-  transaction you opened yourself the cursor joins it; it never commits on your behalf.
-- **Database Explorer** (DataGrip-style): connection → database → schema → tables. Views, materialized
-  views, sequences and routines are hidden behind a "N views · … hidden — show" line (or the 👁 toolbar
-  toggle). Expanding a table shows columns, keys, foreign keys and indexes; **Properties…** (right-click
-  or ⓘ) explains what an object is.
-- **Table tabs**: click a table to open `name [connection]` with WHERE / ORDER BY bars, header-click
-  sorting, paging, "count all", copy/export and a DDL view. Table tabs and the explorer use their own
-  connection with `lock_timeout = 5s` and `statement_timeout = 30s`, so opening a table never hangs
-  behind a migration's lock or runs for minutes; ■ Stop cancels a slow page sooner. Consoles have no
-  time limit and can be cancelled.
-- **Loading states**: connections show a spinner (or "waiting for password…") and errors with Retry;
-  schemas load behind skeleton rows; a table's first page shows its real columns over a skeleton
-  grid; paging, sorting and filtering keep the previous rows (faded) under a progress bar.
-- **History and saved queries per database** (`history.json`, `saved_queries.json`): every run is
-  listed in the console's History panel; ★ saves a query under a name, and saved queries run with one click.
+<p align="center">
+  A fast, safe PostgreSQL desktop client for macOS. Rust + Tauri, React + Monaco.<br />
+  Explorer, table tabs and SQL consoles — designed so browsing production never hangs, never commits behind your back, and never touches your passwords outside the Keychain.
+</p>
 
-## Run
+<p align="center">
+  <a href="https://github.com/higorhlg/datagrabber/actions/workflows/ci.yml"><img src="https://github.com/higorhlg/datagrabber/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="Apache-2.0" /></a>
+  <img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="macOS" />
+</p>
 
-```sh
-pnpm install
-pnpm app                   # dev mode (hot reload)
-pnpm build                 # release bundle → src-tauri/target/release/bundle/macos/Datagrabber.app
-```
+![A table tab with WHERE / ORDER BY bars, header sorting and a row count](docs/media/table-tab.png)
 
-## Try it on fake data
+## Features
 
-```sh
-pnpm sample-db             # in-memory PostgreSQL (PGlite) on 127.0.0.1:54329, any user/password
-```
+- **Database Explorer** — connection → database → schema → tables, with row estimates, columns,
+  keys, foreign keys and indexes. Views, sequences and routines stay out of the way until you ask
+  for them, and **Properties…** explains any object (is it a table or a view?).
+- **Table tabs** — click a table to open it: WHERE and ORDER BY bars, click-to-sort headers, paging,
+  `count(*)` on demand, copy/export (TSV, CSV, JSON, INSERT) and its DDL.
+- **SQL consoles** — Monaco editor with schema-aware autocomplete (including table aliases),
+  ⌘↵ runs the statement under the cursor, ⇧⌘↵ runs everything, errors are marked where PostgreSQL
+  points, ■ cancels on the server.
+- **History and saved queries per database** — every run is recorded; ★ keeps the good ones, one
+  click reruns them.
+- **Clear loading states** — connecting spinners, schema skeletons, a skeleton grid with the real
+  column names, previous rows kept (faded) while the next page loads, and a Stop button.
+- **DataGrip import** — brings in your DataGrip data sources (`~/DataGripProjects/.idea`), and can
+  copy the passwords DataGrip saved in the macOS Keychain — with your approval for each one.
 
-Then open **Sample shop (PGlite)** in the sidebar (user `postgres`, any password). PGlite runs every
-connection through one backend, so session settings such as read-only leak between connections there;
-real PostgreSQL does not have that limitation.
+<table>
+  <tr>
+    <td><img src="docs/media/console.png" alt="Console with results, history and saved queries" /></td>
+    <td><img src="docs/media/loading.png" alt="A slow view loading behind a skeleton grid, with a Stop button" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Console, results, history and saved queries</sub></td>
+    <td align="center"><sub>A slow view: skeleton grid, timer and ■ Stop</sub></td>
+  </tr>
+</table>
 
-## Tests
+## Safe by design
 
-```sh
-pnpm real-db               # real PostgreSQL (embedded binaries) on :54330, in another terminal
-pnpm test                  # SQL splitter/alias tests + Rust unit and integration tests
-                           # (integration tests need DATAGRABBER_TEST_PG=54330 in the environment)
-pnpm e2e --scenario sample --home /tmp/dg-e2e    # drives the real app window against the sample DB
-pnpm e2e --scenario loading --home /tmp/dg-load  # loading states and Stop against `pnpm real-db`
-pnpm e2e --scenario passwords --home /tmp/dg-pw  # DataGrip password copy with fake Keychain items
-```
+Database GUIs make it easy to hurt production by accident. Datagrabber's defaults are built around that:
 
-`pnpm e2e` builds a debug app and runs `web/src/selftest.ts` inside it (clicks, typing, editor
-commands); `--screenshot out.png` captures the window. Use `--home` to keep test data out of
-`~/.datagrabber`.
-
-## Layout
-
-| Path | What |
+| Risk | What Datagrabber does |
 | --- | --- |
-| `src-tauri/src/` | Rust backend: sessions/TLS (`session.rs`), statement execution (`query.rs`), introspection, DataGrip import, keychain, storage, Tauri commands |
-| `web/src/` | UI: sidebar/schema tree, consoles (Monaco), results grid, dialogs, self-test |
-| `shared/` | Types shared with the UI, SQL statement splitter and alias resolution (with tests) |
-| `dev/` | Sample DB (PGlite), real Postgres for tests, e2e runner |
+| `select * from huge_table` streams millions of rows | Consoles fetch through a server-side cursor (`DECLARE … FETCH n`), so the server stops at the row cap (500 by default). |
+| Clicking a table queues behind a migration's lock | The explorer and table tabs run on their own connection with `lock_timeout = 5s` and `statement_timeout = 30s`; you get a clear message, never a hang. |
+| A tool quietly commits your open transaction | Inside a `BEGIN` you opened, the cursor joins your transaction; it never wraps it in its own `COMMIT`. |
+| Writing to prod by mistake | Connections can be read-only (every session starts with read-only transactions). Imported names containing "prod" start read-only, and prod connections are red. |
+| Passwords in config files | Passwords live only in the macOS Keychain. Connections, consoles and history are plain JSON files in `~/.datagrabber`, owner-only. |
+| Websites talking to a local server | There is no local server: the UI calls Rust directly through Tauri IPC. |
+
+Read-only mode is a guard rail, not a permission boundary — use a read-only database role for real enforcement.
+
+## Install
+
+**From source** (macOS, Node 24+, pnpm 10, Rust stable):
+
+```sh
+git clone https://github.com/higorhlg/datagrabber.git
+cd datagrabber
+pnpm install
+pnpm build          # → src-tauri/target/release/bundle/macos/Datagrabber.app
+```
+
+**Prebuilt:** tagged releases attach a universal `.dmg`. It is not notarized yet; on first launch
+right-click the app → Open.
+
+Want a database to try it on? `pnpm sample-db` serves a fake shop on `127.0.0.1:54329` (in-memory
+PGlite, any user/password).
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph UI["Web UI (React, in the Tauri window)"]
+    Explorer --> api[lib/api.ts]
+    Tables[Table tabs] --> api
+    Console[Consoles] --> api
+  end
+  api -- Tauri IPC --> commands
+  subgraph Rust["Rust backend"]
+    commands --> db
+    commands --> storage
+    commands --> datagrip
+    db -- "console connection (your SQL)" --> PG[(PostgreSQL)]
+    db -- "meta connection (explorer, tables; timeouts)" --> PG
+    storage --> files[~/.datagrabber JSON]
+    storage --> keychain[macOS Keychain]
+  end
+```
+
+| Path | Responsibility |
+| --- | --- |
+| `src-tauri/src/commands/` | The UI's API: thin Tauri commands per area (connections, queries, explorer, library, DataGrip) |
+| `src-tauri/src/db/` | Sessions (TLS, read-only, timeouts, cancel), cursor-capped execution, introspection, DDL |
+| `src-tauri/src/storage/` | Connections, consoles, history, saved queries (atomic, owner-only JSON) and Keychain secrets |
+| `src-tauri/src/datagrip/` | DataGrip import and Keychain password copy |
+| `web/src/app/` | App shell: connection state, tabs, status bar |
+| `web/src/features/` | Explorer, table tabs, consoles, connection dialogs |
+| `web/src/ui/` | Shared components: results grid, dialogs, loading states |
+| `web/src/lib/` | API client, types, SQL splitter and alias resolver, Monaco setup |
+
+## Development
+
+```sh
+pnpm app            # run with hot reload
+pnpm lint           # Biome (TypeScript, CSS)
+pnpm typecheck
+pnpm test           # web unit tests + Rust unit/integration tests
+```
+
+Rust integration tests run against a real PostgreSQL started from npm (no Docker):
+
+```sh
+pnpm real-db                                   # terminal 1, port 54330
+DATAGRABBER_TEST_PG=54330 pnpm test            # terminal 2
+```
+
+They cover the row cap on a 5M-row query, never committing a user transaction, per-connection
+read-only, server-side cancel, giving up on a locked table within 5 s, introspection and DDL.
+
+`pnpm e2e --scenario sample|loading|passwords|import --home /tmp/dg` builds the app and drives the
+real window through an in-app self-test (connect, browse, table tabs, consoles, saved queries,
+loading states, DataGrip import) — it opens an app window while it runs.
+
+## Status
+
+Built for PostgreSQL on macOS. Not yet: editing rows in the grid, ER diagrams, schema compare,
+other databases, Windows/Linux builds (Tauri supports them; untested).
+
+Datagrabber is an independent project and is not affiliated with JetBrains. DataGrip is a trademark
+of JetBrains s.r.o.; it is mentioned only to describe import compatibility.
+
+## License
+
+[Apache-2.0](LICENSE)
