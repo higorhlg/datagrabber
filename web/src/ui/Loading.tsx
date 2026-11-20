@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 
 /** Small rotating ring. */
 export function Spinner({ size = 12 }: { size?: number }) {
@@ -58,14 +58,18 @@ export function SkeletonGrid({ columns, rows = 14, overlay }: { columns: string[
       <div className="grid-header" style={{ gridTemplateColumns: template }}>
         <div className="grid-corner">#</div>
         {shown.map((name, i) => (
-          <div key={i} className="grid-head-cell static"><span className="col-name">{name || <span className="shimmer" style={{ width: 60 }} />}</span></div>
+          <div key={i} className="grid-head-cell static">
+            <span className="col-name">{name || <span className="shimmer" style={{ width: 60 }} />}</span>
+          </div>
         ))}
       </div>
       {Array.from({ length: rows }, (_, r) => (
         <div key={r} className="skeleton-row" style={{ gridTemplateColumns: template }}>
           <div className="grid-rownum" />
           {shown.map((_, c) => (
-            <div key={c} className="grid-cell"><span className="shimmer" style={{ width: `${SKELETON_WIDTHS[(r * 3 + c) % SKELETON_WIDTHS.length]}%` }} /></div>
+            <div key={c} className="grid-cell">
+              <span className="shimmer" style={{ width: `${SKELETON_WIDTHS[(r * 3 + c) % SKELETON_WIDTHS.length]}%` }} />
+            </div>
           ))}
         </div>
       ))}

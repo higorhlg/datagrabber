@@ -10,7 +10,7 @@ import type {
   QueryResult,
   SavedQuery,
   TablePageRequest,
-} from '../../shared/types.ts';
+} from './types.ts';
 
 /** A backend failure, carrying the flags the UI reacts to (needsPassword, notConnected). */
 export class ApiError extends Error {
@@ -56,9 +56,11 @@ export type PasswordCopyResult = {
 export const api = {
   listConnections: () => call<ConnectionSummary[]>('list_connections'),
   createConnection: (input: ConnectionInput, choice: PasswordChoice = {}) => call<ConnectionConfig>('create_connection', { input, choice }),
-  updateConnection: (id: string, input: ConnectionInput, choice: PasswordChoice = {}) => call<ConnectionConfig>('update_connection', { id, input, choice }),
+  updateConnection: (id: string, input: ConnectionInput, choice: PasswordChoice = {}) =>
+    call<ConnectionConfig>('update_connection', { id, input, choice }),
   deleteConnection: (id: string) => call<void>('delete_connection', { id }),
-  testConnection: (input: ConnectionInput, id?: string, password?: string) => call<{ serverVersion: string }>('test_connection', { input, id, password }),
+  testConnection: (input: ConnectionInput, id?: string, password?: string) =>
+    call<{ serverVersion: string }>('test_connection', { input, id, password }),
   connect: (id: string, choice: PasswordChoice = {}) => call<{ serverVersion: string }>('connect', { id, choice }),
   disconnect: (id: string) => call<void>('disconnect', { id }),
   forgetPassword: (id: string) => call<void>('forget_password', { id }),
@@ -68,7 +70,8 @@ export const api = {
   tablePage: (id: string, request: TablePageRequest) => call<TablePageResponse>('table_page', { id, request }),
   cancelTableQuery: (id: string) => call<void>('cancel_table_query', { id }),
   tableCount: (id: string, schema: string, table: string, filter?: string) => call<number>('table_count', { id, schema, table, filter }),
-  objectDdl: (id: string, schema: string, name: string, kind: DdlKind, args?: string) => call<string>('object_ddl', { id, schema, name, kind, arguments: args }),
+  objectDdl: (id: string, schema: string, name: string, kind: DdlKind, args?: string) =>
+    call<string>('object_ddl', { id, schema, name, kind, arguments: args }),
   savedQueries: (id: string) => call<SavedQuery[]>('list_saved_queries', { id }),
   saveQuery: (id: string, name: string, sql: string) => call<SavedQuery>('save_query', { id, name, sql }),
   renameSavedQuery: (queryId: string, name: string) => call<void>('rename_saved_query', { queryId, name }),

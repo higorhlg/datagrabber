@@ -1,5 +1,21 @@
-import { api } from './api.ts';
-import { monaco } from './monaco-setup.ts';
+import { api } from '../lib/api.ts';
+import { monaco } from '../lib/monaco/setup.ts';
+import {
+  all,
+  byText,
+  expectSeen,
+  field,
+  pageRange,
+  sleep,
+  status,
+  treeRow,
+  typeInto,
+  visibleAll,
+  visibleCells,
+  visibleEditor,
+  waitFor,
+  watchAppearances,
+} from './dom.ts';
 
 /**
  * End-to-end self-test that drives the real UI inside the Tauri window (clicks, typing, editor
@@ -14,61 +30,19 @@ import { monaco } from './monaco-setup.ts';
  * - "import": import every DataGrip data source through the import dialog, check prod ones are
  *   read-only, and check a connection asks for its password without contacting the server.
  */
-type SelfTestConfig = { scenario: 'sample' | 'import' | 'passwords' | 'loading'; realPort?: number; realPassword?: string; samplePort?: number; expectedImports?: number; holdMs?: number; addSample?: boolean; datagripDir?: string };
+export type SelfTestConfig = {
+  scenario: 'sample' | 'import' | 'passwords' | 'loading';
+  realPort?: number;
+  realPassword?: string;
+  samplePort?: number;
+  expectedImports?: number;
+  holdMs?: number;
+  addSample?: boolean;
+  datagripDir?: string;
+};
 
 const SAMPLE_NAME = 'Sample shop (PGlite)';
 const log: string[] = [];
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/** Polls until `find` returns a truthy value, failing with `what` after the timeout. */
-async function waitFor<T>(what: string, find: () => T | null | undefined | false | Promise<T | null | undefined | false>, timeoutMs = 10_000): Promise<T> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const found = await find();
-    if (found) return found;
-    await sleep(50);
-  }
-  throw new Error(`Timed out waiting for ${what}`);
-}
-
-const all = <T extends Element = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
-/** Elements currently rendered on screen (hidden tabs excluded). */
-const visibleAll = <T extends Element = HTMLElement>(selector: string) => all<T>(selector).filter((el) => (el as unknown as HTMLElement).offsetParent !== null);
-const byText = (selector: string, text: string | RegExp) =>
-  all(selector).find((el) => (typeof text === 'string' ? el.textContent?.trim() === text : text.test(el.textContent ?? '')));
-
-/** Sets a React-controlled input's value the way typing would. */
-function typeInto(input: HTMLInputElement, value: string): void {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
-  setter.call(input, value);
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
-/** Finds the input inside a form label that starts with `text`. */
-function field(text: string): HTMLInputElement {
-  const label = all('label').find((l) => l.textContent?.trim().startsWith(text));
-  const input = label?.querySelector('input');
-  if (!input) throw new Error(`No field labelled ${text}`);
-  return input;
-}
-
-/** The editor in the visible console. */
-function visibleEditor() {
-  return monaco.editor.getEditors().find((e) => (e.getDomNode()?.offsetParent ?? null) !== null);
-}
-
-const status = () => document.querySelector('[data-testid=results-status]')?.textContent ?? '';
-const pageRange = () => document.querySelector('[data-testid=page-range]')?.textContent ?? '';
-/** Explorer row label with exactly this text. */
-const treeRow = (label: string) => all('.tree-row .node-label').find((el) => el.textContent === label);
-/** Values of one column in the visible table tab's grid. */
-function visibleCells(column: string): string[] {
-  const view = all('[data-testid=table-view]').find((v) => v.offsetParent !== null);
-  if (!view) return [];
-  const index = visibleAll('.grid-head-cell .col-name').filter((h) => view.contains(h)).findIndex((h) => h.textContent === column);
-  return [...view.querySelectorAll('.grid-row')].map((r) => r.querySelectorAll('.grid-cell')[index]?.textContent ?? '');
-}
-
 /** Asks the runner to screenshot the window now (with --screenshot), pausing so the capture lands. */
 async function snap(label: string): Promise<void> {
   await api.e2eLog(`snap:${label}`);
@@ -102,7 +76,8 @@ async function sampleScenario(config: SelfTestConfig): Promise<void> {
   await step('connect from the explorer: tables only, views hidden behind a hint', async () => {
     treeRow(name)!.click();
     await waitFor('table customers in tree', () => treeRow('customers'), 15_000);
-    for (const table of ['orders', 'order_items', 'products', 'daily_revenue', 'app_settings']) if (!treeRow(table)) throw new Error(`missing table ${table}`);
+    for (const table of ['orders', 'order_items', 'products', 'daily_revenue', 'app_settings'])
+      if (!treeRow(table)) throw new Error(`missing table ${table}`);
     if (treeRow('order_totals')) throw new Error('views should be hidden by default');
     const hint = await waitFor('hidden kinds hint', () => byText('.hidden-kinds', /1 view · 3 sequences hidden/));
     log.push(`     hint: ${hint.textContent}`);
@@ -117,12 +92,18 @@ async function sampleScenario(config: SelfTestConfig): Promise<void> {
     const filter = document.querySelector<HTMLInputElement>('[data-testid=filter-input]')!;
     typeInto(filter, "status = 'refunded'");
     filter.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    await waitFor('filtered page', () => pageRange().startsWith('1–') && visibleCells('status').every((v) => v === 'refunded') && visibleCells('status').length > 0);
+    await waitFor(
+      'filtered page',
+      () => pageRange().startsWith('1–') && visibleCells('status').every((v) => v === 'refunded') && visibleCells('status').length > 0,
+    );
     byText('.grid-head-cell .col-name', 'id')!.closest('button')!.click();
     await waitFor('ORDER BY from header', () => document.querySelector<HTMLInputElement>('[data-testid=order-input]')!.value === 'id asc');
     byText('.grid-head-cell .col-name', 'id')!.closest('button')!.click();
     await waitFor('descending', () => document.querySelector<HTMLInputElement>('[data-testid=order-input]')!.value === 'id desc');
-    await waitFor('rows sorted desc', () => { const ids = visibleCells('id').map(Number); return ids.length > 1 && ids[0] > ids[1]; });
+    await waitFor('rows sorted desc', () => {
+      const ids = visibleCells('id').map(Number);
+      return ids.length > 1 && ids[0] > ids[1];
+    });
     byText('.row-pill button', 'count all')!.click();
     const total = await waitFor('total count', () => document.querySelector('[data-testid=total-count]'));
     log.push(`     refunded orders: ${total.textContent}, breadcrumb: ${document.querySelector('[data-testid=breadcrumb]')!.textContent}`);
@@ -136,7 +117,9 @@ async function sampleScenario(config: SelfTestConfig): Promise<void> {
   await step('reveal views and open Properties from the context menu', async () => {
     byText('.hidden-kinds', /hidden/)!.click();
     await waitFor('view in tree', () => treeRow('order_totals'));
-    treeRow('order_totals')!.closest('.tree-row')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 200, clientY: 300 }));
+    treeRow('order_totals')!
+      .closest('.tree-row')!
+      .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 200, clientY: 300 }));
     (await waitFor('context menu', () => byText('.context-menu button', 'Properties…'))).click();
     const props = await waitFor('properties dialog', () => document.querySelector('[data-testid=properties]'));
     if (!/view/.test(props.querySelector('.kind-label')?.textContent ?? '')) throw new Error('properties should say view');
@@ -147,12 +130,14 @@ async function sampleScenario(config: SelfTestConfig): Promise<void> {
   });
 
   await step('open the query console (double-click the connection)', async () => {
-    treeRow(name)!.closest('.tree-row')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    treeRow(name)!
+      .closest('.tree-row')!
+      .dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     await waitFor('console editor', () => visibleEditor());
   });
   await step('run the statement under the cursor (⌘↵ path)', async () => {
     const editor = visibleEditor()!;
-    editor.setValue('select 1 as one;\n\nselect id, email, country from shop.customers\nwhere country = \'BR\'\norder by id;\n');
+    editor.setValue("select 1 as one;\n\nselect id, email, country from shop.customers\nwhere country = 'BR'\norder by id;\n");
     editor.setPosition({ lineNumber: 3, column: 5 });
     editor.trigger('selftest', 'datagrabber.run', {});
     await waitFor('rows from customers', () => /^\d+ rows/.test(status()) && status());
@@ -168,7 +153,8 @@ async function sampleScenario(config: SelfTestConfig): Promise<void> {
     const error = await waitFor('error panel', () => visibleAll('[data-testid=query-error]')[0]);
     if (!/column "nope" does not exist/.test(error.textContent ?? '')) throw new Error(`unexpected error ${error.textContent}`);
     const markers = monaco.editor.getModelMarkers({ resource: editor.getModel()!.uri });
-    if (markers.length !== 1 || markers[0].startLineNumber !== 2) throw new Error(`expected an error marker on line 2, got ${JSON.stringify(markers)}`);
+    if (markers.length !== 1 || markers[0].startLineNumber !== 2)
+      throw new Error(`expected an error marker on line 2, got ${JSON.stringify(markers)}`);
     if (all('.results-tab').length !== 2) throw new Error('third statement should not have run');
   });
 
@@ -178,8 +164,14 @@ async function sampleScenario(config: SelfTestConfig): Promise<void> {
     editor.setPosition({ lineNumber: 1, column: 10 });
     editor.focus();
     editor.trigger('selftest', 'editor.action.triggerSuggest', {});
-    const suggestion = await waitFor('customer_id suggestion', () => all('.suggest-widget .monaco-list-row').find((r) => r.getAttribute('aria-label')?.includes('customer_id')));
-    log.push(`     suggested: ${all('.suggest-widget .monaco-list-row').map((r) => r.getAttribute('aria-label')?.split(',')[0]).join(', ')}`);
+    const suggestion = await waitFor('customer_id suggestion', () =>
+      all('.suggest-widget .monaco-list-row').find((r) => r.getAttribute('aria-label')?.includes('customer_id')),
+    );
+    log.push(
+      `     suggested: ${all('.suggest-widget .monaco-list-row')
+        .map((r) => r.getAttribute('aria-label')?.split(',')[0])
+        .join(', ')}`,
+    );
     editor.trigger('selftest', 'hideSuggestWidget', {});
     void suggestion;
   });
@@ -190,7 +182,9 @@ async function sampleScenario(config: SelfTestConfig): Promise<void> {
     editor.setPosition({ lineNumber: 1, column: 1 });
     editor.trigger('selftest', 'datagrabber.run', {});
     await waitFor('products rows', () => status().startsWith('5 rows'));
-    const cell = visibleAll('.grid-row').map((r) => r.querySelectorAll('.grid-cell')[2]).find(Boolean)!;
+    const cell = visibleAll('.grid-row')
+      .map((r) => r.querySelectorAll('.grid-cell')[2])
+      .find(Boolean)!;
     cell.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     const viewer = await waitFor('value viewer', () => document.querySelector('.value-viewer'));
     if (!viewer.textContent?.includes('"weight_g"')) throw new Error('JSON should be pretty-printed');
@@ -209,7 +203,10 @@ async function sampleScenario(config: SelfTestConfig): Promise<void> {
     nameInput.form!.requestSubmit();
     await waitFor('saved item', () => byText('.saved-name', 'Brazil customers'));
     editor.setValue('-- scratch');
-    byText('.saved-name', 'Brazil customers')!.closest('[data-testid=saved-item]')!.querySelector<HTMLButtonElement>('[data-testid=run-saved]')!.click();
+    byText('.saved-name', 'Brazil customers')!
+      .closest('[data-testid=saved-item]')!
+      .querySelector<HTMLButtonElement>('[data-testid=run-saved]')!
+      .click();
     await waitFor('saved query results', () => status().startsWith('3 rows'));
   });
 
@@ -257,7 +254,8 @@ async function importScenario(config: SelfTestConfig): Promise<void> {
   await step('imported connections are listed, prod ones read-only', async () => {
     const connections = await api.listConnections();
     const imported = connections.filter((c) => c.datagripUuid);
-    if (config.expectedImports !== undefined && imported.length !== config.expectedImports) throw new Error(`expected ${config.expectedImports} imports, got ${imported.length}`);
+    if (config.expectedImports !== undefined && imported.length !== config.expectedImports)
+      throw new Error(`expected ${config.expectedImports} imports, got ${imported.length}`);
     for (const c of imported) {
       if (/prod/i.test(c.name) !== c.readOnly) throw new Error(`${c.name}: read-only should be ${/prod/i.test(c.name)}`);
       log.push(`     ${c.name.padEnd(30)} ${c.readOnly ? 'READ-ONLY' : 'read-write'}  ssl=${c.sslMode}  port=${c.port}`);
@@ -297,7 +295,8 @@ async function passwordsScenario(config: SelfTestConfig): Promise<void> {
     const results = await waitFor('copy results', () => document.querySelector('[data-testid=copy-results]'));
     const text = results.textContent ?? '';
     log.push(`     ${text.replace(/\s+/g, ' ')}`);
-    if (!/Fake shop dev.*Copied/.test(text) || !/Fake shop prod.*No password saved in DataGrip/.test(text)) throw new Error(`unexpected results: ${text}`);
+    if (!/Fake shop dev.*Copied/.test(text) || !/Fake shop prod.*No password saved in DataGrip/.test(text))
+      throw new Error(`unexpected results: ${text}`);
     if (document.body.innerHTML.includes('fake-password')) throw new Error('password leaked into the page');
     byText('.modal-foot button', 'Done')!.click();
     const listed = await api.listConnections();
@@ -312,29 +311,12 @@ async function passwordsScenario(config: SelfTestConfig): Promise<void> {
 
   await step('the other connection asks, and "Use the password saved in DataGrip" explains there is none', async () => {
     treeRow('Fake shop prod')!.click();
-    (await waitFor('use DataGrip password link', () => document.querySelector<HTMLButtonElement>('[data-testid=use-datagrip-password]'))).click();
+    (
+      await waitFor('use DataGrip password link', () => document.querySelector<HTMLButtonElement>('[data-testid=use-datagrip-password]'))
+    ).click();
     await waitFor('explanation', () => byText('.modal .status.error', /no saved password/i));
     byText('.modal-foot button', 'Cancel')!.click();
   });
-}
-
-/**
- * Records which of the given selectors appear in the DOM at any moment (even briefly), so fast
- * loading states can be asserted after the fact.
- */
-function watchAppearances(selectors: string[]): { seen: Set<string>; stop: () => void } {
-  const seen = new Set<string>();
-  const check = () => selectors.forEach((selector) => document.querySelector(selector) && seen.add(selector));
-  const observer = new MutationObserver(check);
-  observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
-  check();
-  return { seen, stop: () => observer.disconnect() };
-}
-
-/** Asserts that every watched selector showed up. */
-function expectSeen(watch: { seen: Set<string> }, selectors: string[], what: string): void {
-  const missing = selectors.filter((s) => !watch.seen.has(s));
-  if (missing.length) throw new Error(`${what}: never saw ${missing.join(', ')}`);
 }
 
 /**
@@ -366,7 +348,9 @@ async function loadingScenario(config: SelfTestConfig): Promise<void> {
   });
 
   await step('create a demo table from a console and refresh the explorer', async () => {
-    treeRow(name)!.closest('.tree-row')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    treeRow(name)!
+      .closest('.tree-row')!
+      .dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     const editor = await waitFor('console editor', () => visibleEditor());
     editor.setValue(
       'drop view if exists slow_demo;\ndrop table if exists loading_demo;\ncreate table loading_demo as select g as id, md5(g::text) as label, now() as created_at from generate_series(1, 2000) g;\ncreate view slow_demo as select d.*, pg_sleep(0.008) is not null as slept from loading_demo d;',
@@ -427,14 +411,17 @@ const PREFERENCE_KEYS = ['datagrabber.explorer.showAllKinds', 'datagrabber.conso
 /** Clears UI preferences so the test starts from defaults; returns a function restoring the user's values. */
 function isolatePreferences(): () => void {
   const saved = PREFERENCE_KEYS.map((key) => [key, localStorage.getItem(key)] as const);
-  PREFERENCE_KEYS.forEach((key) => localStorage.removeItem(key));
-  return () => saved.forEach(([key, value]) => (value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value)));
+  for (const key of PREFERENCE_KEYS) localStorage.removeItem(key);
+  return () => {
+    for (const [key, value] of saved) {
+      if (value === null) localStorage.removeItem(key);
+      else localStorage.setItem(key, value);
+    }
+  };
 }
 
-/** Starts the self-test when the app was launched for one. */
-export async function runSelfTestIfRequested(): Promise<void> {
-  const config = (await api.e2eConfig().catch(() => null)) as SelfTestConfig | null;
-  if (!config) return;
+/** Runs the self-test described by `config` and reports the outcome to the process. */
+export async function runSelfTest(config: SelfTestConfig): Promise<void> {
   const restorePreferences = isolatePreferences();
   let ok = true;
   try {

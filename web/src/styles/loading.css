@@ -1,0 +1,148 @@
+/* Spinners, progress bar, skeletons and faded reloads. */
+.spinner {
+  display: inline-block;
+  flex: none;
+}
+.progress-bar {
+  position: relative;
+  height: 2px;
+  flex: none;
+  overflow: hidden;
+  background: transparent;
+}
+.progress-bar.active::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: progress-slide 1.1s ease-in-out infinite;
+}
+@keyframes progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+.loading-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 16px;
+  color: var(--muted);
+}
+.elapsed {
+  color: var(--faint);
+  font-size: 11.5px;
+}
+.shimmer {
+  display: inline-block;
+  height: 10px;
+  border-radius: 4px;
+  vertical-align: middle;
+  background: linear-gradient(90deg, var(--hover) 0%, var(--border-strong) 50%, var(--hover) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s linear infinite;
+}
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.skeleton-grid {
+  position: relative;
+}
+.skeleton-row {
+  display: grid;
+  height: 26px;
+  align-items: center;
+  width: max-content;
+  min-width: 100%;
+}
+.grid-head-cell.static {
+  cursor: default;
+}
+.skeleton-overlay {
+  position: absolute;
+  inset: 60px 0 auto 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.skeleton-overlay .loading-message {
+  background: var(--island-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 10px 16px;
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+.grid-holder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+}
+/*
+ * The previous page fades while the next one loads. WebKit paints the scrolling grid on its own
+ * layer, which neither ancestor opacity nor an overlay reliably covers, so the text color fades.
+ */
+.grid-holder.dimmed {
+  cursor: progress;
+}
+.grid-holder.dimmed .grid-cell,
+.grid-holder.dimmed .grid-rownum,
+.grid-holder.dimmed .col-name,
+.grid-holder.dimmed .grid-cell.null,
+.grid-holder.dimmed .col-type,
+.grid-holder.dimmed .col-icon {
+  color: var(--faint);
+}
+.pill-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.stopped-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--island-2);
+}
+.running-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.running-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  margin-left: 4px;
+}
+.phase-label {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 400;
+}
+.tree-row.loading-row {
+  gap: 6px;
+}
+.skeleton-tree .tree-row:hover {
+  background: none;
+}

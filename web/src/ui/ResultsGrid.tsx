@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowDown, ArrowUp, Columns2, KeyRound } from 'lucide-react';
-import type { QueryResult } from '../../../shared/types.ts';
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import type { QueryResult } from '../lib/types.ts';
 
 const ROW_HEIGHT = 26;
 const OVERSCAN = 12;
@@ -54,7 +54,15 @@ function compareCells(a: string | null, b: string | null, numeric: boolean): num
  * Read-only results grid: virtualized rows, sortable headers (locally, or by the server for table
  * tabs), cell selection with arrow keys, ⌘C copy, Enter/double-click to open a value.
  */
-export function ResultsGrid({ result, filter = '', onSelectValue, onOpenValue, serverSort, primaryKeys, firstRowNumber = 1 }: ResultsGridProps) {
+export function ResultsGrid({
+  result,
+  filter = '',
+  onSelectValue,
+  onOpenValue,
+  serverSort,
+  primaryKeys,
+  firstRowNumber = 1,
+}: ResultsGridProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [height, setHeight] = useState(400);
@@ -63,17 +71,19 @@ export function ResultsGrid({ result, filter = '', onSelectValue, onOpenValue, s
   const widths = useMemo(() => columnWidths(result), [result]);
   const template = `56px ${widths.map((w) => `calc(${w}ch + ${CELL_PADDING_PX}px)`).join(' ')}`;
 
+  const sortsOnServer = Boolean(serverSort);
   const rows = useMemo(() => {
     const needle = filter.trim().toLowerCase();
     let indexed = result.rows.map((row, index) => ({ row, index }));
     if (needle) indexed = indexed.filter(({ row }) => row.some((v) => v?.toLowerCase().includes(needle)));
-    if (sort && !serverSort) {
+    if (sort && !sortsOnServer) {
       const numeric = NUMERIC_TYPES.test(result.columns[sort.col]?.type ?? '');
       indexed = [...indexed].sort((a, b) => compareCells(a.row[sort.col], b.row[sort.col], numeric) * (sort.desc ? -1 : 1));
     }
     return indexed;
-  }, [result, filter, sort]);
+  }, [result, filter, sort, sortsOnServer]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new result resets sorting, selection and scroll
   useEffect(() => {
     setSort(undefined);
     setSelected(undefined);
@@ -131,15 +141,35 @@ export function ResultsGrid({ result, filter = '', onSelectValue, onOpenValue, s
   };
 
   if (result.columns.length === 0) {
-    return <div className="grid-message">{result.command} completed{result.rowCount !== null ? ` — ${result.rowCount} row${result.rowCount === 1 ? '' : 's'} affected` : ''}.</div>;
+    return (
+      <div className="grid-message">
+        {result.command} completed{result.rowCount !== null ? ` — ${result.rowCount} row${result.rowCount === 1 ? '' : 's'} affected` : ''}.
+      </div>
+    );
   }
 
   return (
-    <div className="grid" ref={scroller} tabIndex={0} onKeyDown={onKeyDown} onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)} data-testid="results-grid">
+    <div
+      className="grid"
+      ref={scroller}
+      role="grid"
+      aria-rowcount={rows.length}
+      aria-colcount={result.columns.length}
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+      onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+      data-testid="results-grid"
+    >
       <div className="grid-header" style={{ gridTemplateColumns: template }}>
         <div className="grid-corner">#</div>
         {result.columns.map((column, col) => (
-          <button key={col} className="grid-head-cell" onClick={() => toggleSort(col)} title={`${column.name} (${column.type}) — click to sort`}>
+          <button
+            type="button"
+            key={col}
+            className="grid-head-cell"
+            onClick={() => toggleSort(col)}
+            title={`${column.name} (${column.type}) — click to sort`}
+          >
             {primaryKeys?.has(column.name) ? <KeyRound size={13} className="col-icon pk" /> : <Columns2 size={13} className="col-icon" />}
             <span className="col-name">{column.name}</span>
             <span className="col-type">{column.type}</span>

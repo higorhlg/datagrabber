@@ -1,25 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { Editor, type OnMount } from '@monaco-editor/react';
+import { History as HistoryIcon, ListVideo, Play, Square, Star } from 'lucide-react';
 import type * as Monaco from 'monaco-editor';
-import type { ConnectionSummary, DatabaseSchema } from '../../../shared/types.ts';
-import { splitSql, statementAt, type SqlStatement } from '../../../shared/sql-split.ts';
-import { api, ApiError } from '../api.ts';
-import { setModelSchema } from '../completion.ts';
-import { monaco } from '../monaco-setup.ts';
-import { useEditorTheme } from '../theme.ts';
-import { Play, ListVideo, Square, Star, History as HistoryIcon } from 'lucide-react';
-import { LoadingMessage } from './Loading.tsx';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ApiError, api, type RunResponse } from '../../lib/api.ts';
+import { setModelSchema } from '../../lib/monaco/completion.ts';
+import { monaco } from '../../lib/monaco/setup.ts';
+import { type SqlStatement, splitSql, statementAt } from '../../lib/sql/split.ts';
+import { useEditorTheme } from '../../lib/theme.ts';
+import type { ConnectionSummary, DatabaseSchema } from '../../lib/types.ts';
+import { LoadingMessage } from '../../ui/Loading.tsx';
 import { QueryLibrary } from './QueryLibrary.tsx';
 import { ResultsPane, type ResultTab } from './ResultsPane.tsx';
 
 /** A request from outside the editor: run a statement (e.g. table preview) or insert text. */
-export type WorkspaceRequest = { kind: 'run' | 'insert'; sql: string; nonce: number };
+export type ConsoleRequest = { kind: 'run' | 'insert'; sql: string; nonce: number };
 
-type WorkspaceProps = {
+type ConsoleViewProps = {
   connection: ConnectionSummary;
   schema: DatabaseSchema | undefined;
   visible: boolean;
-  request: WorkspaceRequest | undefined;
+  request: ConsoleRequest | undefined;
   ensureConnected: () => Promise<boolean>;
   onSchemaChanged: () => void;
   onSaveFile: (fileName: string, contents: string) => void;
@@ -32,7 +32,11 @@ const MAX_TABS = 20;
 
 /** Short tab label for a statement: its first line, trimmed. */
 function labelFor(index: number, sql: string): string {
-  const firstLine = sql.split('\n').find((l) => l.trim() && !l.trim().startsWith('--'))?.trim() ?? sql.trim();
+  const firstLine =
+    sql
+      .split('\n')
+      .find((l) => l.trim() && !l.trim().startsWith('--'))
+      ?.trim() ?? sql.trim();
   return `${index + 1}: ${firstLine.length > 32 ? `${firstLine.slice(0, 32)}…` : firstLine}`;
 }
 
@@ -60,7 +64,16 @@ function writeLibraryPreference(open: boolean): void {
  * The console for one connection: a persisted SQL editor, run/cancel controls, results and history.
  * Stays mounted while hidden so editor state and results survive tab switches.
  */
-export function Workspace({ connection, schema, visible, request, ensureConnected, onSchemaChanged, onSaveFile, notify }: WorkspaceProps) {
+export function ConsoleView({
+  connection,
+  schema,
+  visible,
+  request,
+  ensureConnected,
+  onSchemaChanged,
+  onSaveFile,
+  notify,
+}: ConsoleViewProps) {
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor>(null);
   const [initialText, setInitialText] = useState<string>();
   const [tabs, setTabs] = useState<ResultTab[]>([]);
@@ -76,13 +89,16 @@ export function Workspace({ connection, schema, visible, request, ensureConnecte
   const theme = useEditorTheme();
 
   useEffect(() => {
-    api.loadConsole(connection.id).then((text) => setInitialText(text || `-- ${connection.name}\nselect now();\n`)).catch(() => setInitialText(''));
+    api
+      .loadConsole(connection.id)
+      .then((text) => setInitialText(text || `-- ${connection.name}\nselect now();\n`))
+      .catch(() => setInitialText(''));
   }, [connection.id, connection.name]);
 
   useEffect(() => {
     const model = editorRef.current?.getModel();
     if (model) setModelSchema(model, schema);
-  }, [schema, initialText]);
+  }, [schema]);
 
   useEffect(() => {
     if (!running) return;
@@ -126,7 +142,12 @@ export function Workspace({ connection, schema, visible, request, ensureConnecte
     const model = editorRef.current?.getModel();
     if (model) monaco.editor.setModelMarkers(model, 'postgres', []);
     if (!(await ensureConnected())) return;
-    const batch: ResultTab[] = statements.map((s, i) => ({ id: `${Date.now()}-${i}`, label: labelFor(i, s.text), sql: s.text, status: 'running' }));
+    const batch: ResultTab[] = statements.map((s, i) => ({
+      id: `${Date.now()}-${i}`,
+      label: labelFor(i, s.text),
+      sql: s.text,
+      status: 'running',
+    }));
     setTabs(batch);
     setActiveTab(batch[0].id);
     setRunning(true);
@@ -134,7 +155,7 @@ export function Workspace({ connection, schema, visible, request, ensureConnecte
     try {
       for (let i = 0; i < statements.length; i++) {
         setActiveTab(batch[i].id);
-        let response;
+        let response: RunResponse;
         try {
           response = await api.run(connection.id, statements[i].text, maxRows);
         } catch (error) {
@@ -175,7 +196,10 @@ export function Workspace({ connection, schema, visible, request, ensureConnecte
     if (selection && !selection.isEmpty()) {
       const offset = model.getOffsetAt(selection.getStartPosition());
       const selected = model.getValueInRange(selection);
-      runStatements(splitSql(selected).map((s) => ({ ...s, start: s.start + offset, end: s.end + offset })), true);
+      runStatements(
+        splitSql(selected).map((s) => ({ ...s, start: s.start + offset, end: s.end + offset })),
+        true,
+      );
       return;
     }
     const statement = statementAt(text, model.getOffsetAt(editor.getPosition()!));
@@ -219,22 +243,32 @@ export function Workspace({ connection, schema, visible, request, ensureConnecte
     }
   };
 
-  const actions = useRef({ runCurrent, runAll });
-  actions.current = { runCurrent, runAll };
+  const actions = useRef({ runCurrent, runAll, runStatements });
+  actions.current = { runCurrent, runAll, runStatements };
 
   const onMount: OnMount = (editor) => {
     editorRef.current = editor;
     const model = editor.getModel();
     if (model) setModelSchema(model, schema);
-    editor.addAction({ id: 'datagrabber.run', label: 'Run statement', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter], run: () => actions.current.runCurrent() });
-    editor.addAction({ id: 'datagrabber.runAll', label: 'Run all statements', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter], run: () => actions.current.runAll() });
+    editor.addAction({
+      id: 'datagrabber.run',
+      label: 'Run statement',
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+      run: () => actions.current.runCurrent(),
+    });
+    editor.addAction({
+      id: 'datagrabber.runAll',
+      label: 'Run all statements',
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter],
+      run: () => actions.current.runAll(),
+    });
     editor.focus();
   };
 
   useEffect(() => {
     if (!request) return;
     if (request.kind === 'run') {
-      runStatements([{ text: request.sql, start: 0, end: request.sql.length }], false);
+      actions.current.runStatements([{ text: request.sql, start: 0, end: request.sql.length }], false);
       return;
     }
     const editor = editorRef.current;
@@ -242,12 +276,14 @@ export function Workspace({ connection, schema, visible, request, ensureConnecte
     if (!editor || !model) return;
     const end = model.getFullModelRange().getEndPosition();
     const prefix = model.getValue().trim() ? '\n\n' : '';
-    editor.executeEdits('datagrabber', [{ range: new monaco.Range(end.lineNumber, end.column, end.lineNumber, end.column), text: `${prefix}${request.sql}` }]);
+    editor.executeEdits('datagrabber', [
+      { range: new monaco.Range(end.lineNumber, end.column, end.lineNumber, end.column), text: `${prefix}${request.sql}` },
+    ]);
     const last = model.getFullModelRange().getEndPosition();
     editor.setPosition(last);
     editor.revealPosition(last);
     editor.focus();
-  }, [request?.nonce]);
+  }, [request]);
 
   const runFromLibrary = (sql: string) => runStatements([{ text: sql, start: 0, end: sql.length }], false);
 
@@ -255,7 +291,9 @@ export function Workspace({ connection, schema, visible, request, ensureConnecte
     const editor = editorRef.current;
     const position = editor?.getPosition();
     if (!editor || !position) return;
-    editor.executeEdits('history', [{ range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column), text: `${sql};\n` }]);
+    editor.executeEdits('history', [
+      { range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column), text: `${sql};\n` },
+    ]);
     editor.focus();
   };
 
@@ -271,29 +309,73 @@ export function Workspace({ connection, schema, visible, request, ensureConnecte
   };
 
   return (
-    <div className="workspace" style={{ display: visible ? 'flex' : 'none', ['--conn-color' as string]: connection.color }}>
+    <div className="console-view" style={{ display: visible ? 'flex' : 'none', ['--conn-color' as string]: connection.color }}>
       <div className="toolbar">
-        <button className="primary run" onClick={runCurrent} disabled={running} title="Run statement at cursor or selection (⌘↵)" data-testid="run"><Play size={13} fill="currentColor" /> Run</button>
-        <button className="tool" onClick={runAll} disabled={running} title="Run all statements (⇧⌘↵)" data-testid="run-all"><ListVideo size={16} /></button>
-        <button className="tool danger" onClick={cancel} disabled={!running} title="Cancel the running statement" data-testid="cancel"><Square size={14} fill="currentColor" /></button>
+        <button
+          type="button"
+          className="primary run"
+          onClick={runCurrent}
+          disabled={running}
+          title="Run statement at cursor or selection (⌘↵)"
+          data-testid="run"
+        >
+          <Play size={13} fill="currentColor" /> Run
+        </button>
+        <button type="button" className="tool" onClick={runAll} disabled={running} title="Run all statements (⇧⌘↵)" data-testid="run-all">
+          <ListVideo size={16} />
+        </button>
+        <button
+          type="button"
+          className="tool danger"
+          onClick={cancel}
+          disabled={!running}
+          title="Cancel the running statement"
+          data-testid="cancel"
+        >
+          <Square size={14} fill="currentColor" />
+        </button>
         <span className="tool-sep" />
-        <button className="tool" onClick={saveCurrent} title="Save the current statement to this database's saved queries" data-testid="save-query"><Star size={15} /></button>
-        {running && <span className="running-chip"><span className="spinner" /> <span className="mono">{(elapsed / 1000).toFixed(1)}s</span></span>}
+        <button
+          type="button"
+          className="tool"
+          onClick={saveCurrent}
+          title="Save the current statement to this database's saved queries"
+          data-testid="save-query"
+        >
+          <Star size={15} />
+        </button>
+        {running && (
+          <span className="running-chip">
+            <span className="spinner" /> <span className="mono">{(elapsed / 1000).toFixed(1)}s</span>
+          </span>
+        )}
         <span className="spacer" />
         <label className="small muted max-rows">
           Max rows
           <select value={maxRows} onChange={(e) => setMaxRows(Number(e.target.value))}>
-            {MAX_ROW_CHOICES.map((n) => <option key={n} value={n}>{n.toLocaleString()}</option>)}
+            {MAX_ROW_CHOICES.map((n) => (
+              <option key={n} value={n}>
+                {n.toLocaleString()}
+              </option>
+            ))}
           </select>
         </label>
-        <button className={`tool labeled${showLibrary ? ' pressed' : ''}`} onClick={() => toggleLibrary(!showLibrary)} data-testid="toggle-history" title="History and saved queries for this database"><HistoryIcon size={15} /> History</button>
+        <button
+          type="button"
+          className={`tool labeled${showLibrary ? ' pressed' : ''}`}
+          onClick={() => toggleLibrary(!showLibrary)}
+          data-testid="toggle-history"
+          title="History and saved queries for this database"
+        >
+          <HistoryIcon size={15} /> History
+        </button>
         <span className="conn-chip" title={`${connection.user}@${connection.host}:${connection.port}/${connection.database}`}>
           <span className="conn-swatch" />
           {connection.database}
           {connection.readOnly && <span className="badge ro">READ-ONLY</span>}
         </span>
       </div>
-      <div className="workspace-body">
+      <div className="console-body">
         <div className="editor-and-results">
           <div className="editor" style={{ height: `${editorHeight}%` }}>
             {initialText === undefined && <LoadingMessage>Opening console…</LoadingMessage>}
@@ -305,7 +387,17 @@ export function Workspace({ connection, schema, visible, request, ensureConnecte
                 theme={theme}
                 onMount={onMount}
                 onChange={(value) => persist(value ?? '')}
-                options={{ fontSize: 13, minimap: { enabled: false }, scrollBeyondLastLine: false, automaticLayout: true, tabSize: 2, wordBasedSuggestions: 'off', quickSuggestions: { other: true, strings: false, comments: false }, renderLineHighlight: 'line', fixedOverflowWidgets: true }}
+                options={{
+                  fontSize: 13,
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                  tabSize: 2,
+                  wordBasedSuggestions: 'off',
+                  quickSuggestions: { other: true, strings: false, comments: false },
+                  renderLineHighlight: 'line',
+                  fixedOverflowWidgets: true,
+                }}
               />
             )}
           </div>

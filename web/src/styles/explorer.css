@@ -1,0 +1,175 @@
+/* Database Explorer tree and its toolbar. */
+.explorer {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--island-2);
+}
+.explorer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px 8px 6px;
+}
+.explorer-filter {
+  margin: 0 10px 6px;
+  padding: 4px 8px;
+  background: var(--island);
+}
+.tree {
+  overflow: auto;
+  flex: 1;
+  padding: 2px 6px 16px;
+}
+.tree-empty {
+  padding: 16px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding-right: 8px;
+  white-space: nowrap;
+  cursor: default;
+  border-radius: 6px;
+}
+.tree-row:hover {
+  background: var(--hover);
+}
+.tree-row.selected {
+  background: var(--selected);
+}
+.tree-row.connection-row {
+  font-weight: 500;
+}
+.tree-row.detail-row {
+  height: 23px;
+  font-size: 12.5px;
+}
+.tree-row.hidden-kinds {
+  font-size: 12px;
+  cursor: pointer;
+}
+.chevron {
+  width: 16px;
+  display: inline-flex;
+  justify-content: center;
+  color: var(--muted);
+  flex: none;
+}
+.node-icon {
+  display: inline-flex;
+  width: 18px;
+  justify-content: center;
+  flex: none;
+}
+.node-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.node-extra {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 11.5px;
+  flex: none;
+}
+.tree-row .node-extra:last-child {
+  margin-left: auto;
+  padding-left: 8px;
+}
+.tree-row.connection-row .node-extra {
+  margin-left: 6px;
+}
+.tree-note {
+  padding: 4px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.tree-note.error {
+  color: var(--danger);
+  white-space: normal;
+}
+.conn-icon {
+  position: relative;
+  display: inline-flex;
+  color: var(--conn-color);
+}
+.conn-live {
+  position: absolute;
+  right: -3px;
+  bottom: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3fb950;
+  border: 1.5px solid var(--island-2);
+}
+.ic-folder {
+  color: var(--ic-folder);
+}
+.ic-table {
+  color: var(--ic-table);
+}
+.ic-view {
+  color: var(--ic-view);
+}
+.ic-col {
+  color: var(--ic-col);
+}
+.ic-key {
+  color: var(--ic-key);
+}
+.ic-fk {
+  color: var(--ic-fk);
+}
+.ic-index {
+  color: var(--ic-col);
+}
+.ic-db {
+  color: var(--ic-db);
+}
+.ic-schema {
+  color: var(--ic-schema);
+}
+.ic-fn {
+  color: var(--ic-fn);
+}
+.ic-seq {
+  color: var(--ic-seq);
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+  flex: none;
+  display: inline-block;
+}
+.status-dot.on {
+  background: #3fb950;
+}
+.badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+  background: var(--hover);
+  color: var(--muted);
+  margin: 0 4px;
+}
+.badge.ro {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  color: var(--danger);
+}
+.badge.pk {
+  background: color-mix(in srgb, var(--ic-key) 18%, transparent);
+  color: var(--ic-key);
+  margin-left: 0;
+}
+.node-extra .badge {
+  margin-left: 0;
+}

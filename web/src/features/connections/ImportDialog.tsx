@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { DatagripCandidate } from '../../../shared/types.ts';
-import { api } from '../api.ts';
-import { Modal } from './Modal.tsx';
+import { api } from '../../lib/api.ts';
+import type { DatagripCandidate } from '../../lib/types.ts';
+import { Modal } from '../../ui/Modal.tsx';
 
 type ImportDialogProps = { onClose: () => void; onImported: (count: number) => void };
 
@@ -32,6 +32,7 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
     }
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scan the default folder once, when the dialog opens
   useEffect(() => {
     load();
   }, []);
@@ -64,27 +65,51 @@ export function ImportDialog({ onClose, onImported }: ImportDialogProps) {
         <>
           <span className="muted small">Passwords stay in DataGrip's encrypted store — you'll be asked once per connection.</span>
           <span className="spacer" />
-          <button className="ghost" onClick={onClose}>Cancel</button>
-          <button className="primary" onClick={runImport} disabled={busy || selected.size === 0}>Import {selected.size || ''}</button>
+          <button type="button" className="ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="primary" onClick={runImport} disabled={busy || selected.size === 0}>
+            Import {selected.size || ''}
+          </button>
         </>
       }
     >
       <div className="import-dir">
         <input value={dir} onChange={(e) => setDir(e.target.value)} placeholder="~/DataGripProjects/.idea" />
-        <button className="ghost" onClick={() => load(dir)} disabled={busy}>Scan</button>
+        <button type="button" className="ghost" onClick={() => load(dir)} disabled={busy}>
+          Scan
+        </button>
       </div>
       {error && <p className="status error">{error}</p>}
       {candidates && candidates.length === 0 && <p className="muted">No data sources found in this folder.</p>}
       {candidates && candidates.length > 0 && (
         <table className="import-table">
           <thead>
-            <tr><th /><th>Name</th><th>Host</th><th>Database</th><th>User</th><th /></tr>
+            <tr>
+              <th />
+              <th>Name</th>
+              <th>Host</th>
+              <th>Database</th>
+              <th>User</th>
+              <th />
+            </tr>
           </thead>
           <tbody>
             {candidates.map((c) => (
               <tr key={c.uuid} className={c.importable ? '' : 'disabled'}>
-                <td><input type="checkbox" disabled={!c.importable} checked={selected.has(c.uuid)} onChange={() => toggle(c.uuid)} aria-label={`Import ${c.name}`} /></td>
-                <td>{c.name}{/prod/i.test(c.name) && <span className="badge ro">RO</span>}</td>
+                <td>
+                  <input
+                    type="checkbox"
+                    disabled={!c.importable}
+                    checked={selected.has(c.uuid)}
+                    onChange={() => toggle(c.uuid)}
+                    aria-label={`Import ${c.name}`}
+                  />
+                </td>
+                <td>
+                  {c.name}
+                  {/prod/i.test(c.name) && <span className="badge ro">RO</span>}
+                </td>
                 <td className="mono">{c.host ? `${c.host}:${c.port}` : '—'}</td>
                 <td className="mono">{c.database ?? '—'}</td>
                 <td className="mono">{c.user ?? '—'}</td>

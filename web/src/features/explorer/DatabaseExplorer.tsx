@@ -1,18 +1,21 @@
-import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
 import {
   ChevronDown,
   ChevronRight,
   Columns2,
   Database,
+  Download,
   Eye,
   FileCode2,
   Folder,
   FolderOpen,
   FunctionSquare,
+  Info,
   KeyRound,
+  KeySquare,
   Layers,
   Link2,
   ListOrdered,
+  ListTree,
   Plus,
   RefreshCw,
   Rows3,
@@ -20,18 +23,18 @@ import {
   SquareTerminal,
   Table2,
   Unplug,
-  Download,
-  ListTree,
-  Info,
-  KeySquare,
 } from 'lucide-react';
-import type { ConnectionSummary, DatabaseSchema, RelationInfo, RoutineInfo, SchemaInfo } from '../../../shared/types.ts';
-import { quoteIdent } from '../completion.ts';
-import { ContextMenu, type MenuItem } from './ContextMenu.tsx';
-import { Spinner, SkeletonTree } from './Loading.tsx';
+import { type MouseEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
+import { quoteIdent } from '../../lib/monaco/completion.ts';
+import type { ConnectionSummary, DatabaseSchema, RelationInfo, RoutineInfo, SchemaInfo } from '../../lib/types.ts';
+import { ContextMenu, type MenuItem } from '../../ui/ContextMenu.tsx';
+import { SkeletonTree, Spinner } from '../../ui/Loading.tsx';
 
 /** Explorer data for a connection; `refreshing` keeps the old tree visible while it reloads. */
-export type SchemaState = { status: 'loading' } | { status: 'ready'; schema: DatabaseSchema; refreshing?: boolean } | { status: 'error'; message: string };
+export type SchemaState =
+  | { status: 'loading' }
+  | { status: 'ready'; schema: DatabaseSchema; refreshing?: boolean }
+  | { status: 'error'; message: string };
 
 /** What a connection is waiting on while it opens. */
 export type ConnectionPhase = 'connecting' | 'password';
@@ -123,7 +126,21 @@ type RowProps = {
 };
 
 /** One tree line: indent, chevron, icon, label and trailing muted info. */
-function Row({ depth, icon, label, extra, expandable, open, selected, onToggle, onClick, onDoubleClick, onContextMenu, title, className }: RowProps) {
+function Row({
+  depth,
+  icon,
+  label,
+  extra,
+  expandable,
+  open,
+  selected,
+  onToggle,
+  onClick,
+  onDoubleClick,
+  onContextMenu,
+  title,
+  className,
+}: RowProps) {
   return (
     <div
       className={`tree-row${selected ? ' selected' : ''}${className ? ` ${className}` : ''}`}
@@ -173,7 +190,9 @@ export function DatabaseExplorer({ connections, schemas, phases, connectErrors, 
 
   const connectionMenu = (c: ConnectionSummary): MenuItem[] => [
     { label: 'Open query console', onSelect: () => actions.openConsole(c) },
-    c.connected ? { label: 'Refresh schema', onSelect: () => actions.refreshSchema(c) } : { label: 'Connect', onSelect: () => actions.connect(c) },
+    c.connected
+      ? { label: 'Refresh schema', onSelect: () => actions.refreshSchema(c) }
+      : { label: 'Connect', onSelect: () => actions.connect(c) },
     { label: 'Edit connection…', onSelect: () => actions.edit(c) },
     { label: 'Disconnect', onSelect: () => actions.disconnect(c), disabled: !c.connected },
     ...(c.datagripUuid ? [{ label: 'Copy password from DataGrip', onSelect: () => actions.copyDatagripPasswords(c) }] : []),
@@ -209,27 +228,133 @@ export function DatabaseExplorer({ connections, schemas, phases, connectErrors, 
         <span className="island-title">Database Explorer</span>
       </header>
       <div className="explorer-toolbar" role="toolbar">
-        <button className="tool" title="New connection" onClick={actions.newConnection}><Plus size={16} /></button>
-        <button className="tool" title="Import from DataGrip" onClick={actions.importDatagrip}><Download size={16} /></button>
-        <button className="tool" title="Copy passwords saved in DataGrip" onClick={() => actions.copyDatagripPasswords()} data-testid="copy-passwords"><KeySquare size={16} /></button>
+        <button type="button" className="tool" title="New connection" onClick={actions.newConnection}>
+          <Plus size={16} />
+        </button>
+        <button type="button" className="tool" title="Import from DataGrip" onClick={actions.importDatagrip}>
+          <Download size={16} />
+        </button>
+        <button
+          type="button"
+          className="tool"
+          title="Copy passwords saved in DataGrip"
+          onClick={() => actions.copyDatagripPasswords()}
+          data-testid="copy-passwords"
+        >
+          <KeySquare size={16} />
+        </button>
         <span className="tool-sep" />
-        <button className="tool" title="Refresh schema" disabled={!toolbarConnection?.connected} onClick={() => toolbarConnection && actions.refreshSchema(toolbarConnection)}><RefreshCw size={16} /></button>
-        <button className="tool" title="Disconnect" disabled={!toolbarConnection?.connected} onClick={() => toolbarConnection && actions.disconnect(toolbarConnection)}><Unplug size={16} /></button>
+        <button
+          type="button"
+          className="tool"
+          title="Refresh schema"
+          disabled={!toolbarConnection?.connected}
+          onClick={() => toolbarConnection && actions.refreshSchema(toolbarConnection)}
+        >
+          <RefreshCw size={16} />
+        </button>
+        <button
+          type="button"
+          className="tool"
+          title="Disconnect"
+          disabled={!toolbarConnection?.connected}
+          onClick={() => toolbarConnection && actions.disconnect(toolbarConnection)}
+        >
+          <Unplug size={16} />
+        </button>
         <span className="tool-sep" />
-        <button className="tool" title="Open query console" disabled={!toolbarConnection} onClick={() => toolbarConnection && actions.openConsole(toolbarConnection)}><SquareTerminal size={16} /></button>
-        <button className="tool" title="Open table" disabled={!selectedRelation} onClick={() => toolbarConnection && selectedRelation && actions.openTable(toolbarConnection, selectedRelation.schema, selectedRelation.relation)}><Table2 size={16} /></button>
-        <button className="tool text" title="Show DDL" disabled={!selectedRelation} onClick={() => toolbarConnection && selectedRelation && actions.openTable(toolbarConnection, selectedRelation.schema, selectedRelation.relation, 'ddl')}>DDL</button>
-        <button className="tool" title="Properties" disabled={!selectedRelation} onClick={() => toolbarConnection && selectedRelation && actions.showProperties(toolbarConnection, selectedRelation.schema, selectedRelation.relation)}><Info size={16} /></button>
+        <button
+          type="button"
+          className="tool"
+          title="Open query console"
+          disabled={!toolbarConnection}
+          onClick={() => toolbarConnection && actions.openConsole(toolbarConnection)}
+        >
+          <SquareTerminal size={16} />
+        </button>
+        <button
+          type="button"
+          className="tool"
+          title="Open table"
+          disabled={!selectedRelation}
+          onClick={() =>
+            toolbarConnection &&
+            selectedRelation &&
+            actions.openTable(toolbarConnection, selectedRelation.schema, selectedRelation.relation)
+          }
+        >
+          <Table2 size={16} />
+        </button>
+        <button
+          type="button"
+          className="tool text"
+          title="Show DDL"
+          disabled={!selectedRelation}
+          onClick={() =>
+            toolbarConnection &&
+            selectedRelation &&
+            actions.openTable(toolbarConnection, selectedRelation.schema, selectedRelation.relation, 'ddl')
+          }
+        >
+          DDL
+        </button>
+        <button
+          type="button"
+          className="tool"
+          title="Properties"
+          disabled={!selectedRelation}
+          onClick={() =>
+            toolbarConnection &&
+            selectedRelation &&
+            actions.showProperties(toolbarConnection, selectedRelation.schema, selectedRelation.relation)
+          }
+        >
+          <Info size={16} />
+        </button>
         <span className="tool-sep" />
-        <button className={`tool${showAllKinds ? ' pressed' : ''}`} title={showAllKinds ? 'Showing views, sequences and routines — click to show tables only' : 'Showing tables only — click to also show views, sequences and routines'} aria-pressed={showAllKinds} onClick={() => setShowAllKinds(!showAllKinds)} data-testid="toggle-all-kinds"><Eye size={16} /></button>
-        <button className="tool" title="Collapse all" onClick={() => setExpanded(Object.fromEntries(connections.map((c) => [c.id, false])))}><ListTree size={16} /></button>
+        <button
+          type="button"
+          className={`tool${showAllKinds ? ' pressed' : ''}`}
+          title={
+            showAllKinds
+              ? 'Showing views, sequences and routines — click to show tables only'
+              : 'Showing tables only — click to also show views, sequences and routines'
+          }
+          aria-pressed={showAllKinds}
+          onClick={() => setShowAllKinds(!showAllKinds)}
+          data-testid="toggle-all-kinds"
+        >
+          <Eye size={16} />
+        </button>
+        <button
+          type="button"
+          className="tool"
+          title="Collapse all"
+          onClick={() => setExpanded(Object.fromEntries(connections.map((c) => [c.id, false])))}
+        >
+          <ListTree size={16} />
+        </button>
       </div>
-      <input className="explorer-filter" placeholder="Filter objects…" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter objects" />
+      <input
+        className="explorer-filter"
+        placeholder="Filter objects…"
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+        aria-label="Filter objects"
+      />
       <div className="tree" role="tree">
         {connections.length === 0 && (
           <div className="tree-empty">
-            No connections yet.<br />
-            <button className="link" onClick={actions.importDatagrip}>Import from DataGrip</button> or <button className="link" onClick={actions.newConnection}>add one</button>.
+            No connections yet.
+            <br />
+            <button type="button" className="link" onClick={actions.importDatagrip}>
+              Import from DataGrip
+            </button>{' '}
+            or{' '}
+            <button type="button" className="link" onClick={actions.newConnection}>
+              add one
+            </button>
+            .
           </div>
         )}
         {connections.map((c) => {
@@ -248,7 +373,16 @@ export function DatabaseExplorer({ connections, schemas, phases, connectErrors, 
                 expandable
                 open={connOpen}
                 selected={selection?.key === connKey}
-                icon={phase ? <Spinner size={13} /> : <span className="conn-icon"><Server size={15} />{c.connected && <span className="conn-live" />}</span>}
+                icon={
+                  phase ? (
+                    <Spinner size={13} />
+                  ) : (
+                    <span className="conn-icon">
+                      <Server size={15} />
+                      {c.connected && <span className="conn-live" />}
+                    </span>
+                  )
+                }
                 label={c.name}
                 extra={
                   phase || refreshing || c.readOnly ? (
@@ -270,13 +404,19 @@ export function DatabaseExplorer({ connections, schemas, phases, connectErrors, 
               />
               {connectError && !phase && !c.connected && (
                 <div className="tree-note error" style={{ paddingLeft: 48 }} data-testid="connect-error">
-                  {connectError} <button className="link" onClick={() => actions.connect(c)}>Retry</button>
+                  {connectError}{' '}
+                  <button type="button" className="link" onClick={() => actions.connect(c)}>
+                    Retry
+                  </button>
                 </div>
               )}
               {connOpen && state?.status === 'loading' && <SkeletonTree depth={1} label="Loading schema…" />}
               {connOpen && state?.status === 'error' && (
                 <div className="tree-note error" style={{ paddingLeft: 48 }}>
-                  {state.message} <button className="link" onClick={() => actions.refreshSchema(c)}>Retry</button>
+                  {state.message}{' '}
+                  <button type="button" className="link" onClick={() => actions.refreshSchema(c)}>
+                    Retry
+                  </button>
                 </div>
               )}
               {connOpen && state?.status === 'ready' && (
@@ -321,7 +461,20 @@ type DatabaseNodeProps = {
 };
 
 /** The database node and everything below it. */
-function DatabaseNode({ connection: c, schema, needle, isOpen, toggle, selection, onSelect, actions, relationMenu, objectMenu, showAllKinds, onShowAllKinds }: DatabaseNodeProps) {
+function DatabaseNode({
+  connection: c,
+  schema,
+  needle,
+  isOpen,
+  toggle,
+  selection,
+  onSelect,
+  actions,
+  relationMenu,
+  objectMenu,
+  showAllKinds,
+  onShowAllKinds,
+}: DatabaseNodeProps) {
   const dbKey = `${c.id}/db`;
   const openByDefault = useMemo(() => defaultOpenSchemas(schema), [schema]);
   const matches = (name: string) => !needle || name.toLowerCase().includes(needle);
@@ -386,14 +539,31 @@ type SchemaNodeProps = Omit<DatabaseNodeProps, 'schema' | 'needle'> & {
 /** Describes what the tables-only view hides, e.g. "17 views · 15 routines". */
 function hiddenSummary(views: number, matviews: number, sequences: number, routines: number): string {
   const part = (n: number, word: string) => (n ? `${n} ${word}${n === 1 ? '' : 's'}` : '');
-  return [part(views, 'view'), part(matviews, 'materialized view'), part(sequences, 'sequence'), part(routines, 'routine')].filter(Boolean).join(' · ');
+  return [part(views, 'view'), part(matviews, 'materialized view'), part(sequences, 'sequence'), part(routines, 'routine')]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 /**
  * A schema with folders for tables, views, materialized views, sequences and routines. In
  * tables-only mode the other folders collapse into a single line that reveals them.
  */
-function SchemaNode({ connection: c, schemaInfo: s, parentKey, path, defaultOpen, isOpen, toggle, selection, onSelect, actions, relationMenu, objectMenu, showAllKinds, onShowAllKinds }: SchemaNodeProps) {
+function SchemaNode({
+  connection: c,
+  schemaInfo: s,
+  parentKey,
+  path,
+  defaultOpen,
+  isOpen,
+  toggle,
+  selection,
+  onSelect,
+  actions,
+  relationMenu,
+  objectMenu,
+  showAllKinds,
+  onShowAllKinds,
+}: SchemaNodeProps) {
   const schemaKey = `${parentKey}/${s.name}`;
   const open = isOpen(schemaKey, defaultOpen);
   const tables = s.relations.filter((r) => r.kind === 'table' || r.kind === 'partitioned table' || r.kind === 'foreign table');
@@ -470,52 +640,66 @@ function SchemaNode({ connection: c, schemaInfo: s, parentKey, path, defaultOpen
         <>
           {folder('tables', tables.length, true, () => relationRows(tables, 'tables'))}
           {hidden && (
-            <div className="tree-row hidden-kinds" style={{ paddingLeft: 8 + 3 * 16 }} onClick={onShowAllKinds} title="Show views, sequences and routines (👁 in the toolbar toggles this)">
+            <div
+              className="tree-row hidden-kinds"
+              style={{ paddingLeft: 8 + 3 * 16 }}
+              onClick={onShowAllKinds}
+              title="Show views, sequences and routines (👁 in the toolbar toggles this)"
+            >
               <span className="chevron" />
-              <span className="node-label muted">{hidden} hidden — <span className="link-text">show</span></span>
+              <span className="node-label muted">
+                {hidden} hidden — <span className="link-text">show</span>
+              </span>
             </div>
           )}
           {showAllKinds && folder('views', views.length, true, () => relationRows(views, 'views'))}
           {showAllKinds && folder('materialized views', matviews.length, true, () => relationRows(matviews, 'materialized views'))}
-          {showAllKinds && folder('sequences', s.sequences.length, false, () =>
-            s.sequences.map((name) => {
-              const key = `${schemaKey}/seq/${name}`;
-              return (
-                <Row
-                  key={name}
-                  depth={4}
-                  selected={selection?.key === key}
-                  icon={<ListOrdered size={15} className="ic-seq" />}
-                  label={name}
-                  onClick={() => {
-                    onSelect({ key, connectionId: c.id, path: [...path, 'sequences', name] });
-                    actions.openDdl(c, s.name, name, 'sequence');
-                  }}
-                  onContextMenu={(e) => objectMenu(e, ddlMenu(name, 'sequence'))}
-                />
-              );
-            }),
-          )}
-          {showAllKinds && folder('routines', s.routines.length, false, () =>
-            s.routines.map((routine: RoutineInfo) => {
-              const key = `${schemaKey}/fn/${routine.name}(${routine.arguments})`;
-              return (
-                <Row
-                  key={`${routine.name}(${routine.arguments})`}
-                  depth={4}
-                  selected={selection?.key === key}
-                  icon={<FunctionSquare size={15} className="ic-fn" />}
-                  label={<>{routine.name}<span className="muted">({routine.arguments})</span></>}
-                  extra={routine.kind === 'function' ? undefined : routine.kind}
-                  onClick={() => {
-                    onSelect({ key, connectionId: c.id, path: [...path, 'routines', routine.name] });
-                    actions.openDdl(c, s.name, routine.name, 'routine', routine.arguments);
-                  }}
-                  onContextMenu={(e) => objectMenu(e, ddlMenu(routine.name, 'routine', routine.arguments))}
-                />
-              );
-            }),
-          )}
+          {showAllKinds &&
+            folder('sequences', s.sequences.length, false, () =>
+              s.sequences.map((name) => {
+                const key = `${schemaKey}/seq/${name}`;
+                return (
+                  <Row
+                    key={name}
+                    depth={4}
+                    selected={selection?.key === key}
+                    icon={<ListOrdered size={15} className="ic-seq" />}
+                    label={name}
+                    onClick={() => {
+                      onSelect({ key, connectionId: c.id, path: [...path, 'sequences', name] });
+                      actions.openDdl(c, s.name, name, 'sequence');
+                    }}
+                    onContextMenu={(e) => objectMenu(e, ddlMenu(name, 'sequence'))}
+                  />
+                );
+              }),
+            )}
+          {showAllKinds &&
+            folder('routines', s.routines.length, false, () =>
+              s.routines.map((routine: RoutineInfo) => {
+                const key = `${schemaKey}/fn/${routine.name}(${routine.arguments})`;
+                return (
+                  <Row
+                    key={`${routine.name}(${routine.arguments})`}
+                    depth={4}
+                    selected={selection?.key === key}
+                    icon={<FunctionSquare size={15} className="ic-fn" />}
+                    label={
+                      <>
+                        {routine.name}
+                        <span className="muted">({routine.arguments})</span>
+                      </>
+                    }
+                    extra={routine.kind === 'function' ? undefined : routine.kind}
+                    onClick={() => {
+                      onSelect({ key, connectionId: c.id, path: [...path, 'routines', routine.name] });
+                      actions.openDdl(c, s.name, routine.name, 'routine', routine.arguments);
+                    }}
+                    onContextMenu={(e) => objectMenu(e, ddlMenu(routine.name, 'routine', routine.arguments))}
+                  />
+                );
+              }),
+            )}
         </>
       )}
     </>
@@ -537,7 +721,19 @@ type RelationNodeProps = {
 };
 
 /** A table or view. Clicking opens it in a table tab; the chevron reveals columns, keys and indexes. */
-function RelationNode({ connection: c, schema, relation: r, relKey, path, isOpen, toggle, selection, onSelect, actions, onContextMenu }: RelationNodeProps) {
+function RelationNode({
+  connection: c,
+  schema,
+  relation: r,
+  relKey,
+  path,
+  isOpen,
+  toggle,
+  selection,
+  onSelect,
+  actions,
+  onContextMenu,
+}: RelationNodeProps) {
   const open = isOpen(relKey, false);
   const isView = r.kind === 'view' || r.kind === 'materialized view';
   const keys = r.indexes.filter((i) => i.primary || i.unique);
@@ -573,15 +769,50 @@ function RelationNode({ connection: c, schema, relation: r, relKey, path, isOpen
             />
           ))}
           {keys.map((k) => (
-            <Row key={`k:${k.name}`} depth={5} className="detail-row" icon={<KeyRound size={14} className="ic-key" />} label={k.name} extra={k.primary ? 'primary key' : 'unique'} title={k.definition} />
+            <Row
+              key={`k:${k.name}`}
+              depth={5}
+              className="detail-row"
+              icon={<KeyRound size={14} className="ic-key" />}
+              label={k.name}
+              extra={k.primary ? 'primary key' : 'unique'}
+              title={k.definition}
+            />
           ))}
           {r.foreignKeys.map((fk) => (
-            <Row key={`f:${fk.name}`} depth={5} className="detail-row" icon={<Link2 size={14} className="ic-fk" />} label={fk.name} extra="foreign key" title={fk.definition} />
+            <Row
+              key={`f:${fk.name}`}
+              depth={5}
+              className="detail-row"
+              icon={<Link2 size={14} className="ic-fk" />}
+              label={fk.name}
+              extra="foreign key"
+              title={fk.definition}
+            />
           ))}
-          {r.indexes.filter((i) => !i.primary && !i.unique).map((i) => (
-            <Row key={`i:${i.name}`} depth={5} className="detail-row" icon={<Rows3 size={14} className="ic-index" />} label={i.name} extra="index" title={i.definition} />
-          ))}
-          {isView && <Row depth={5} className="detail-row" icon={<FileCode2 size={14} className="ic-col" />} label="definition" extra="DDL" onClick={() => actions.openTable(c, schema, r, 'ddl')} />}
+          {r.indexes
+            .filter((i) => !i.primary && !i.unique)
+            .map((i) => (
+              <Row
+                key={`i:${i.name}`}
+                depth={5}
+                className="detail-row"
+                icon={<Rows3 size={14} className="ic-index" />}
+                label={i.name}
+                extra="index"
+                title={i.definition}
+              />
+            ))}
+          {isView && (
+            <Row
+              depth={5}
+              className="detail-row"
+              icon={<FileCode2 size={14} className="ic-col" />}
+              label="definition"
+              extra="DDL"
+              onClick={() => actions.openTable(c, schema, r, 'ddl')}
+            />
+          )}
         </>
       )}
     </>

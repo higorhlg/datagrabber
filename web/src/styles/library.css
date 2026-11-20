@@ -1,0 +1,80 @@
+/* History and saved queries panel. */
+.library {
+  width: 340px;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: var(--island-2);
+  min-height: 0;
+  flex: none;
+}
+.library-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 6px 10px;
+}
+.library-search {
+  margin: 0 10px 8px;
+  padding: 4px 8px;
+  background: var(--island);
+}
+.name-form {
+  display: flex;
+  gap: 6px;
+  padding: 0 10px 8px;
+}
+.name-form input {
+  flex: 1;
+  padding: 3px 8px;
+}
+.library-list {
+  overflow: auto;
+  flex: 1;
+}
+.library-item {
+  border-top: 1px solid var(--border-strong);
+  padding: 6px 10px 8px 12px;
+}
+.library-item:hover {
+  background: var(--hover);
+}
+.library-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  min-height: 24px;
+}
+.saved-name {
+  color: var(--text);
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-actions {
+  display: flex;
+  gap: 0;
+  opacity: 0.35;
+}
+.library-item:hover .item-actions {
+  opacity: 1;
+}
+.item-actions .tool {
+  width: 24px;
+  height: 24px;
+}
+.library-item code {
+  font: 11.5px var(--mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: block;
+  max-height: 6.5em;
+  overflow: hidden;
+  cursor: text;
+}
+.library-item.failed code {
+  color: var(--danger);
+}

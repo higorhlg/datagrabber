@@ -1,6 +1,6 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
 
 /** Vite builds the UI that runs inside the Tauri window (dev server on :5173, output in dist/web). */
 export default defineConfig({

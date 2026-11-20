@@ -1,7 +1,7 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { splitSql, statementAt, isBlankSql } from './sql-split.ts';
-import { findTableReferences, resolveQualifier } from './sql-context.ts';
+import { test } from 'node:test';
+import { findTableReferences, resolveQualifier } from './context.ts';
+import { isBlankSql, splitSql, statementAt } from './split.ts';
 
 const texts = (sql: string) => splitSql(sql).map((s) => s.text);
 

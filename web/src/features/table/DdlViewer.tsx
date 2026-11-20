@@ -1,13 +1,18 @@
 import { Editor } from '@monaco-editor/react';
-import { useEditorTheme } from '../theme.ts';
-import { LoadingMessage } from './Loading.tsx';
+import { useEditorTheme } from '../../lib/theme.ts';
+import { LoadingMessage } from '../../ui/Loading.tsx';
 
 type DdlViewerProps = { ddl: string | undefined; error?: string };
 
 /** Read-only, highlighted DDL. */
 export function DdlViewer({ ddl, error }: DdlViewerProps) {
   const theme = useEditorTheme();
-  if (error) return <div className="query-error"><strong>{error}</strong></div>;
+  if (error)
+    return (
+      <div className="query-error">
+        <strong>{error}</strong>
+      </div>
+    );
   if (ddl === undefined) return <LoadingMessage>Loading DDL…</LoadingMessage>;
   return (
     <div className="ddl-viewer" data-testid="ddl-viewer">
@@ -15,7 +20,16 @@ export function DdlViewer({ ddl, error }: DdlViewerProps) {
         value={ddl}
         defaultLanguage="pgsql"
         theme={theme}
-        options={{ readOnly: true, domReadOnly: true, minimap: { enabled: false }, fontSize: 13, scrollBeyondLastLine: false, automaticLayout: true, renderLineHighlight: 'none', lineNumbers: 'on' }}
+        options={{
+          readOnly: true,
+          domReadOnly: true,
+          minimap: { enabled: false },
+          fontSize: 13,
+          scrollBeyondLastLine: false,
+          automaticLayout: true,
+          renderLineHighlight: 'none',
+          lineNumbers: 'on',
+        }}
       />
     </div>
   );

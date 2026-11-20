@@ -31,6 +31,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     <div ref={ref} className="context-menu" style={{ left, top }} role="menu">
       {items.map((item) => (
         <button
+          type="button"
           key={item.label}
           role="menuitem"
           className={item.danger ? 'danger' : undefined}

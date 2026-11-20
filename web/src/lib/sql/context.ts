@@ -1,4 +1,4 @@
-import { stripComments } from './sql-split.ts';
+import { stripComments } from './split.ts';
 
 /** A table mentioned in a statement, with the alias it is referenced by (if any). */
 export type TableReference = {
@@ -7,12 +7,38 @@ export type TableReference = {
   alias?: string;
 };
 
-const IDENT = String.raw`(?:"(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)`;
+const IDENT = '(?:"(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$]*)';
 const QUALIFIED = String.raw`(${IDENT})(?:\s*\.\s*(${IDENT}))?`;
 const RESERVED_AFTER_TABLE = new Set([
-  'where', 'join', 'inner', 'left', 'right', 'full', 'cross', 'natural', 'on', 'using', 'group', 'order',
-  'limit', 'offset', 'having', 'union', 'except', 'intersect', 'set', 'values', 'returning', 'window',
-  'lateral', 'for', 'fetch', 'select', 'tablesample', 'default', 'as',
+  'where',
+  'join',
+  'inner',
+  'left',
+  'right',
+  'full',
+  'cross',
+  'natural',
+  'on',
+  'using',
+  'group',
+  'order',
+  'limit',
+  'offset',
+  'having',
+  'union',
+  'except',
+  'intersect',
+  'set',
+  'values',
+  'returning',
+  'window',
+  'lateral',
+  'for',
+  'fetch',
+  'select',
+  'tablesample',
+  'default',
+  'as',
 ]);
 const ALIAS = String.raw`(?:\s+(?:as\s+)?(?!(?:${[...RESERVED_AFTER_TABLE].join('|')})\b)(${IDENT}))?`;
 const TABLE_INTRODUCER = new RegExp(String.raw`\b(?:from|join|update|into|table)\s+(?:only\s+)?${QUALIFIED}${ALIAS}`, 'gi');

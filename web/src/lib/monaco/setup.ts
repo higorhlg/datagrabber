@@ -1,8 +1,8 @@
-import type * as MonacoTypes from 'monaco-editor';
-import * as monacoRuntime from './monaco-entry.ts';
-import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
 import { loader } from '@monaco-editor/react';
+import type * as MonacoTypes from 'monaco-editor';
+import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
 import { registerSqlCompletion } from './completion.ts';
+import * as monacoRuntime from './entry.ts';
 
 /**
  * Bundles Monaco locally (no CDN, PostgreSQL language only), registers SQL completion and the app's editor themes.

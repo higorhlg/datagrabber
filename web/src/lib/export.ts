@@ -1,4 +1,4 @@
-import type { QueryResult } from '../../shared/types.ts';
+import type { QueryResult } from './types.ts';
 
 /** Quotes a CSV field when it contains a delimiter, quote or newline (RFC 4180). */
 function csvField(value: string | null): string {

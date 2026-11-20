@@ -1,0 +1,242 @@
+/* Islands theme: rounded panels on a darker frame, blue accent. Design tokens for light and dark, base elements and buttons. */
+:root {
+  --frame: #f2f3f5;
+  --island: #ffffff;
+  --island-2: #f7f8fa;
+  --border: #ebecf0;
+  --border-strong: #dfe1e5;
+  --text: #1e1f22;
+  --muted: #6f737a;
+  --faint: #a8adbd;
+  --accent: #3574f0;
+  --accent-text: #ffffff;
+  --hover: #f0f1f4;
+  --selected: #d5e1ff;
+  --selected-strong: #c2d4fc;
+  --cell-selected: #d5e1ff;
+  --danger: #e55233;
+  --ok: #208a3c;
+  --null: #a8adbd;
+  --shadow: 0 10px 34px rgba(0, 0, 0, 0.16);
+  --ic-folder: #8f9aae;
+  --ic-table: #3d8eea;
+  --ic-view: #3d8eea;
+  --ic-col: #8f9aae;
+  --ic-key: #d6a000;
+  --ic-fk: #8f9aae;
+  --ic-db: #8f9aae;
+  --ic-schema: #8f9aae;
+  --ic-fn: #b56ed6;
+  --ic-seq: #49a38b;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --frame: #191a1c;
+    --island: #1e1f22;
+    --island-2: #2b2d30;
+    --border: #2b2d30;
+    --border-strong: #393b40;
+    --text: #dfe1e5;
+    --muted: #8c8f96;
+    --faint: #5a5d63;
+    --accent: #3574f0;
+    --hover: #2b2d30;
+    --selected: #2e436e;
+    --selected-strong: #35538f;
+    --cell-selected: #214283;
+    --danger: #f75464;
+    --ok: #5fb865;
+    --null: #6f737a;
+    --shadow: 0 10px 34px rgba(0, 0, 0, 0.6);
+    --ic-folder: #8c8f96;
+    --ic-table: #548af7;
+    --ic-view: #548af7;
+    --ic-col: #8c8f96;
+    --ic-key: #e9b84a;
+    --ic-fk: #8c8f96;
+    --ic-db: #8c8f96;
+    --ic-schema: #8c8f96;
+    --ic-fn: #c77dbb;
+    --ic-seq: #5fb8a0;
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--frame);
+  color: var(--text);
+  font:
+    13px / 1.4 -apple-system,
+    BlinkMacSystemFont,
+    "Inter",
+    "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+input,
+select,
+textarea,
+.value-viewer,
+.query-error,
+.grid-cell,
+.library-item code {
+  user-select: text;
+  -webkit-user-select: text;
+}
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+input,
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--island);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 5px 8px;
+  outline: none;
+}
+input:focus,
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+input::placeholder {
+  color: var(--faint);
+}
+kbd {
+  font: 11px var(--mono);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 4px;
+  margin: 0 1px;
+}
+.mono {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 12px;
+}
+.spacer {
+  flex: 1;
+}
+.pad {
+  padding: 8px 12px;
+}
+.error-text {
+  color: var(--danger);
+}
+
+button.primary {
+  background: var(--accent);
+  color: var(--accent-text);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+button.primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+button.ghost {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+button.ghost:hover:not(:disabled) {
+  background: var(--hover);
+}
+button.ghost.small,
+button.small-btn {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+button.danger-fill {
+  background: var(--danger);
+}
+button.link,
+.link-button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  padding: 0 2px;
+  cursor: pointer;
+}
+.link-text {
+  color: var(--accent);
+}
+button.tool {
+  background: none;
+  border: none;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+  flex: none;
+}
+button.tool.text {
+  width: auto;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+button.tool.labeled {
+  width: auto;
+  padding: 0 8px;
+  gap: 6px;
+  font-size: 12px;
+}
+button.tool:hover:not(:disabled) {
+  background: var(--hover);
+}
+button.tool.pressed {
+  background: var(--selected);
+  color: var(--text);
+}
+button.tool.danger {
+  color: var(--danger);
+}
+button.tool.starred {
+  color: var(--ic-key);
+}
+.tool-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border-strong);
+  margin: 0 4px;
+  flex: none;
+}

@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import type { QueryError, QueryResult } from '../../../shared/types.ts';
-import { toCsv, toInsertSql, toJson, toTsv } from '../export.ts';
-import { ContextMenu, type MenuItem } from './ContextMenu.tsx';
-import { Modal } from './Modal.tsx';
-import { LoadingMessage, ProgressBar } from './Loading.tsx';
-import { ResultsGrid } from './ResultsGrid.tsx';
+import { toCsv, toInsertSql, toJson, toTsv } from '../../lib/export.ts';
+import type { QueryError, QueryResult } from '../../lib/types.ts';
+import { ContextMenu, type MenuItem } from '../../ui/ContextMenu.tsx';
+import { LoadingMessage, ProgressBar } from '../../ui/Loading.tsx';
+import { Modal } from '../../ui/Modal.tsx';
+import { ResultsGrid } from '../../ui/ResultsGrid.tsx';
 
 export type ResultTab = {
   id: string;
@@ -51,7 +51,12 @@ export function ResultsPane({ tabs, activeId, onSelect, onSaveFile, notify, onCa
   if (tabs.length === 0) {
     return (
       <section className="results empty">
-        <p className="muted">Run a statement with <kbd>⌘</kbd><kbd>↵</kbd> (statement at cursor or selection) or <kbd>⇧</kbd><kbd>⌘</kbd><kbd>↵</kbd> (whole console).</p>
+        <p className="muted">
+          Run a statement with <kbd>⌘</kbd>
+          <kbd>↵</kbd> (statement at cursor or selection) or <kbd>⇧</kbd>
+          <kbd>⌘</kbd>
+          <kbd>↵</kbd> (whole console).
+        </p>
       </section>
     );
   }
@@ -81,7 +86,15 @@ export function ResultsPane({ tabs, activeId, onSelect, onSaveFile, notify, onCa
     <section className="results">
       <div className="results-tabs" role="tablist">
         {tabs.map((tab) => (
-          <button key={tab.id} role="tab" aria-selected={tab.id === active?.id} className={`results-tab ${tab.status}${tab.id === active?.id ? ' active' : ''}`} onClick={() => onSelect(tab.id)} title={tab.sql}>
+          <button
+            type="button"
+            key={tab.id}
+            role="tab"
+            aria-selected={tab.id === active?.id}
+            className={`results-tab ${tab.status}${tab.id === active?.id ? ' active' : ''}`}
+            onClick={() => onSelect(tab.id)}
+            title={tab.sql}
+          >
             {tab.status === 'running' && <span className="spinner" />}
             {tab.status === 'error' && <span className="err-dot">!</span>}
             {tab.label}
@@ -92,12 +105,17 @@ export function ResultsPane({ tabs, activeId, onSelect, onSaveFile, notify, onCa
       {active?.status === 'running' && (
         <div className="running-state" data-testid="running">
           <LoadingMessage>Running {active.label.replace(/^\d+: /, '')}</LoadingMessage>
-          <button className="ghost small danger" onClick={onCancel}>Cancel</button>
+          <button type="button" className="ghost small danger" onClick={onCancel}>
+            Cancel
+          </button>
         </div>
       )}
       {active?.status === 'error' && active.error && (
         <div className="query-error" data-testid="query-error">
-          <strong>{active.error.code ? `[${active.error.code}] ` : ''}{active.error.message}</strong>
+          <strong>
+            {active.error.code ? `[${active.error.code}] ` : ''}
+            {active.error.message}
+          </strong>
           {active.error.detail && <p>Detail: {active.error.detail}</p>}
           {active.error.hint && <p>Hint: {active.error.hint}</p>}
           <pre>{active.sql}</pre>
@@ -115,7 +133,9 @@ export function ResultsPane({ tabs, activeId, onSelect, onSaveFile, notify, onCa
             {active.result.columns.length > 0 && (
               <>
                 <input className="results-filter" placeholder="Filter rows…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-                <button className="ghost small" onClick={(e) => openExportMenu(e.clientX, e.clientY, active.result!)}>Copy / Export ▾</button>
+                <button type="button" className="ghost small" onClick={(e) => openExportMenu(e.clientX, e.clientY, active.result!)}>
+                  Copy / Export ▾
+                </button>
               </>
             )}
           </div>
@@ -127,13 +147,29 @@ export function ResultsPane({ tabs, activeId, onSelect, onSaveFile, notify, onCa
           />
           {selectedValue && selectedValue.value !== undefined && (
             <div className="value-bar mono" title="Double-click a cell (or press Enter) to open it">
-              <span className="muted">{selectedValue.name}:</span> {selectedValue.value === null ? <em className="muted">NULL</em> : selectedValue.value.slice(0, 500)}
+              <span className="muted">{selectedValue.name}:</span>{' '}
+              {selectedValue.value === null ? <em className="muted">NULL</em> : selectedValue.value.slice(0, 500)}
             </div>
           )}
         </>
       )}
       {viewing && (
-        <Modal title={`${viewing.name} (${viewing.type})`} onClose={() => setViewing(undefined)} wide footer={<><span className="spacer" /><button className="ghost" onClick={() => copy(viewing.value ?? '', 'value')}>Copy</button><button className="primary" onClick={() => setViewing(undefined)}>Close</button></>}>
+        <Modal
+          title={`${viewing.name} (${viewing.type})`}
+          onClose={() => setViewing(undefined)}
+          wide
+          footer={
+            <>
+              <span className="spacer" />
+              <button type="button" className="ghost" onClick={() => copy(viewing.value ?? '', 'value')}>
+                Copy
+              </button>
+              <button type="button" className="primary" onClick={() => setViewing(undefined)}>
+                Close
+              </button>
+            </>
+          }
+        >
           <pre className="value-viewer">{formatValue(viewing)}</pre>
         </Modal>
       )}
