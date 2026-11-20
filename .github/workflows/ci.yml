@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint, type-check and test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Lint (Biome)
+        run: pnpm lint
+      - name: Type-check
+        run: pnpm typecheck
+      - name: Web unit tests
+        run: pnpm test:web
+      - name: Build web UI (embedded by Tauri)
+        run: pnpm web:build
+
+      - name: rustfmt
+        working-directory: src-tauri
+        run: cargo fmt --check
+      - name: clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Start a real PostgreSQL for integration tests
+        run: |
+          node dev/real-db.ts > real-db.log 2>&1 &
+          for i in $(seq 1 60); do grep -q DATAGRABBER_TEST_PG real-db.log && break; sleep 1; done
+          cat real-db.log
+      - name: Rust unit and integration tests
+        working-directory: src-tauri
+        env:
+          DATAGRABBER_TEST_PG: 54330
+          DATAGRABBER_SECRETS: memory
+        run: cargo test

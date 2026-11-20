@@ -1,8 +1,10 @@
 [package]
 name = "datagrabber"
 version = "0.1.0"
-description = "A personal PostgreSQL client"
+description = "A fast, safe PostgreSQL desktop client"
 authors = ["Higor"]
+license = "Apache-2.0"
+repository = "https://github.com/higorhlg/datagrabber"
 edition = "2024"
 rust-version = "1.90"
 
