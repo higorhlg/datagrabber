@@ -71,12 +71,12 @@ pub fn delete(id: &str) -> CommandResult<()> {
 pub enum ExternalSecret {
     Found(String),
     NotFound,
-    /// The user declined the macOS access prompt, or the keychain refused for another reason.
+    /// The user declined the OS access or unlock prompt, or the keychain refused for another reason.
     Unavailable(String),
 }
 
 /// Reads a password stored by another application (e.g. DataGrip) under `service` / `account`.
-/// macOS shows its own prompt asking the user to allow access to that item. The value is returned
+/// The OS shows its own prompt asking the user to allow access to (or unlock) that item. The value is returned
 /// to the caller only; it is never logged.
 pub fn read_external(service: &str, account: &str) -> ExternalSecret {
     if let Some(store) = memory() {
