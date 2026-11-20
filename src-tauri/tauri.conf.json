@@ -36,6 +36,9 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "A fast, safe PostgreSQL desktop client",
+    "copyright": "Copyright 2026 Higor. Licensed under Apache-2.0."
   }
 }
