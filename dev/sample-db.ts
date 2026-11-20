@@ -115,7 +115,9 @@ await server.start();
 const counts = await db.query<{ customers: number; orders: number }>(
   'select (select count(*) from shop.customers)::int as customers, (select count(*) from shop.orders)::int as orders',
 );
-console.log(`sample db ready on 127.0.0.1:${PORT} (database "postgres", any user/password) — ${counts.rows[0].customers} customers, ${counts.rows[0].orders} orders`);
+console.log(
+  `sample db ready on 127.0.0.1:${PORT} (database "postgres", any user/password) — ${counts.rows[0].customers} customers, ${counts.rows[0].orders} orders`,
+);
 
 process.on('SIGINT', async () => {
   await server.stop();

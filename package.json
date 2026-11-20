@@ -1,24 +1,36 @@
 {
   "name": "datagrabber",
-  "version": "1.0.0",
-  "description": "A personal PostgreSQL client: query editor, schema browser, results grid, DataGrip import.",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A fast, safe PostgreSQL desktop client: DataGrip-style explorer, table tabs, consoles with autocomplete, saved queries.",
+  "license": "Apache-2.0",
+  "author": "Higor (https://github.com/higorhlg)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/higorhlg/datagrabber.git"
+  },
+  "homepage": "https://github.com/higorhlg/datagrabber#readme",
+  "type": "module",
+  "packageManager": "pnpm@10.33.1",
   "scripts": {
     "app": "tauri dev",
     "build": "tauri build",
     "web:build": "vite build",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "node --test \"web/src/**/*.test.ts\" && cd src-tauri && cargo test",
+    "test:web": "node --test \"web/src/**/*.test.ts\"",
     "sample-db": "node dev/sample-db.ts",
     "real-db": "node dev/real-db.ts",
-    "typecheck": "tsc --noEmit -p .",
-    "test": "node --test \"shared/**/*.test.ts\" && cd src-tauri && cargo test",
     "e2e": "node dev/e2e.ts"
   },
-  "author": "Higor",
-  "packageManager": "pnpm@10.33.1",
   "dependencies": {
     "@tauri-apps/api": "^2.12.5",
     "lucide-react": "^1.74.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.6.8",
     "@electric-sql/pglite": "^0.5.16",
     "@electric-sql/pglite-socket": "^0.2.19",
     "@monaco-editor/react": "^4.7.0",
@@ -34,7 +46,5 @@
     "react-dom": "^19.3.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.8"
-  },
-  "type": "module",
-  "private": true
+  }
 }
