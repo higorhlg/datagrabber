@@ -6,18 +6,89 @@
 use tokio_postgres::Client;
 use tokio_postgres::types::Oid;
 
+use super::session::{Session, describe_pg_error};
 use crate::error::{CommandError, CommandResult};
-use crate::session::{Session, describe_pg_error};
 
 /// Words that must be quoted when used as identifiers (PostgreSQL reserved keywords).
 const RESERVED: &[&str] = &[
-    "all", "analyse", "analyze", "and", "any", "array", "as", "asc", "asymmetric", "both", "case", "cast", "check", "collate", "column",
-    "constraint", "create", "current_catalog", "current_date", "current_role", "current_time", "current_timestamp", "current_user",
-    "default", "deferrable", "desc", "distinct", "do", "else", "end", "except", "false", "fetch", "for", "foreign", "from", "grant",
-    "group", "having", "in", "initially", "intersect", "into", "lateral", "leading", "limit", "localtime", "localtimestamp", "not",
-    "null", "offset", "on", "only", "or", "order", "placing", "primary", "references", "returning", "select", "session_user", "some",
-    "symmetric", "system_user", "table", "then", "to", "trailing", "true", "union", "unique", "user", "using", "variadic", "when",
-    "where", "window", "with",
+    "all",
+    "analyse",
+    "analyze",
+    "and",
+    "any",
+    "array",
+    "as",
+    "asc",
+    "asymmetric",
+    "both",
+    "case",
+    "cast",
+    "check",
+    "collate",
+    "column",
+    "constraint",
+    "create",
+    "current_catalog",
+    "current_date",
+    "current_role",
+    "current_time",
+    "current_timestamp",
+    "current_user",
+    "default",
+    "deferrable",
+    "desc",
+    "distinct",
+    "do",
+    "else",
+    "end",
+    "except",
+    "false",
+    "fetch",
+    "for",
+    "foreign",
+    "from",
+    "grant",
+    "group",
+    "having",
+    "in",
+    "initially",
+    "intersect",
+    "into",
+    "lateral",
+    "leading",
+    "limit",
+    "localtime",
+    "localtimestamp",
+    "not",
+    "null",
+    "offset",
+    "on",
+    "only",
+    "or",
+    "order",
+    "placing",
+    "primary",
+    "references",
+    "returning",
+    "select",
+    "session_user",
+    "some",
+    "symmetric",
+    "system_user",
+    "table",
+    "then",
+    "to",
+    "trailing",
+    "true",
+    "union",
+    "unique",
+    "user",
+    "using",
+    "variadic",
+    "when",
+    "where",
+    "window",
+    "with",
 ];
 
 /// Quotes an identifier only when PostgreSQL requires it.
@@ -103,7 +174,10 @@ async fn table_ddl(client: &Client, schema: &str, name: &str, oid: Oid, relkind:
         .await
         .map_err(pg_error)?;
     let extras = client
-        .query_one("select obj_description($1::oid, 'pg_class'), case when $2::text = 'p' then pg_get_partkeydef($1::oid) end", &[&oid, &relkind])
+        .query_one(
+            "select obj_description($1::oid, 'pg_class'), case when $2::text = 'p' then pg_get_partkeydef($1::oid) end",
+            &[&oid, &relkind],
+        )
         .await
         .map_err(pg_error)?;
 
@@ -123,7 +197,12 @@ async fn table_ddl(client: &Client, schema: &str, name: &str, oid: Oid, relkind:
     }
     for column in columns.iter().filter(|c| c.get::<_, Option<String>>(6).is_some()) {
         let comment: String = column.get(6);
-        ddl.push_str(&format!("\ncomment on column {}.{} is {};", qualified(schema, name), quote_ident(column.get::<_, &str>(0)), quote_literal(&comment)));
+        ddl.push_str(&format!(
+            "\ncomment on column {}.{} is {};",
+            qualified(schema, name),
+            quote_ident(column.get::<_, &str>(0)),
+            quote_literal(&comment)
+        ));
     }
     Ok(ddl.trim_end().to_string() + "\n")
 }
@@ -135,7 +214,11 @@ async fn view_ddl(client: &Client, schema: &str, name: &str, oid: Oid, relkind: 
     let keyword = if relkind == "m" { "create materialized view" } else { "create or replace view" };
     let mut ddl = format!("{keyword} {} as\n{}\n", qualified(schema, name), definition.trim_end());
     if relkind == "m" {
-        for index in client.query("select pg_get_indexdef(indexrelid) from pg_index where indrelid = $1::oid order by 1", &[&oid]).await.map_err(pg_error)? {
+        for index in client
+            .query("select pg_get_indexdef(indexrelid) from pg_index where indrelid = $1::oid order by 1", &[&oid])
+            .await
+            .map_err(pg_error)?
+        {
             ddl.push_str(&format!("\n{};", index.get::<_, String>(0)));
         }
     }

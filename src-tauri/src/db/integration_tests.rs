@@ -3,9 +3,9 @@
 
 use std::time::Duration;
 
+use super::query::run_statement;
+use super::session::{Sessions, test};
 use crate::model::{ConnectionConfig, SslMode};
-use crate::query::run_statement;
-use crate::session::{Sessions, test};
 
 const PASSWORD: &str = "it-password";
 
@@ -143,9 +143,10 @@ async fn introspects_tables_columns_and_keys() {
     let sessions = Sessions::default();
     sessions.open(config("meta", false), Some(PASSWORD.into())).await.unwrap();
     rows(&sessions, "meta", "create schema if not exists it_shop").await;
-    rows(&sessions, "meta", "create table if not exists it_shop.items (id serial primary key, name text not null, price numeric(10,2))").await;
+    rows(&sessions, "meta", "create table if not exists it_shop.items (id serial primary key, name text not null, price numeric(10,2))")
+        .await;
     rows(&sessions, "meta", "create or replace view it_shop.cheap as select * from it_shop.items where price < 5").await;
-    let schema = crate::introspect::introspect(&sessions.get("meta").unwrap()).await.unwrap();
+    let schema = super::introspect::introspect(&sessions.get("meta").unwrap()).await.unwrap();
     let shop = schema.schemas.iter().find(|s| s.name == "it_shop").expect("schema listed");
     let items = shop.relations.iter().find(|r| r.name == "items").unwrap();
     assert_eq!(items.kind, "table");
@@ -181,7 +182,7 @@ async fn explorer_lists_indexes_keys_sequences_and_routines() {
     let sessions = Sessions::default();
     sessions.open(config("explorer", false), Some(PASSWORD.into())).await.unwrap();
     seed_shop(&sessions, "explorer", "it_tree").await;
-    let schema = crate::introspect::introspect(&sessions.get("explorer").unwrap()).await.unwrap();
+    let schema = super::introspect::introspect(&sessions.get("explorer").unwrap()).await.unwrap();
     let shop = schema.schemas.iter().find(|s| s.name == "it_tree").unwrap();
     let order = shop.relations.iter().find(|r| r.name == "order").unwrap();
     assert_eq!(order.foreign_keys.len(), 1);
@@ -201,7 +202,7 @@ async fn table_pages_filter_sort_page_and_count() {
     sessions.open(config("pages", false), Some(PASSWORD.into())).await.unwrap();
     seed_shop(&sessions, "pages", "it_pages").await;
     let session = sessions.get("pages").unwrap();
-    let request = |filter: &str, order_by: &str, offset: usize| crate::query::TablePageRequest {
+    let request = |filter: &str, order_by: &str, offset: usize| super::query::TablePageRequest {
         schema: "it_pages".into(),
         table: "order".into(),
         filter: Some(filter.into()),
@@ -209,20 +210,21 @@ async fn table_pages_filter_sort_page_and_count() {
         limit: 100,
         offset,
     };
-    let first = crate::query::fetch_table_page(&session, &request("status = 'paid'", "id desc", 0)).await.unwrap();
+    let first = super::query::fetch_table_page(&session, &request("status = 'paid'", "id desc", 0)).await.unwrap();
     assert_eq!(first.rows.len(), 100);
     assert!(first.truncated);
     assert_eq!(first.rows[0][0].as_deref(), Some("250"));
     assert_eq!(first.columns[0].type_name, "int8");
-    let last = crate::query::fetch_table_page(&session, &request("status = 'paid'", "id desc", 100)).await.unwrap();
+    let last = super::query::fetch_table_page(&session, &request("status = 'paid'", "id desc", 100)).await.unwrap();
     assert_eq!(last.rows.len(), 88);
     assert!(!last.truncated);
-    let count = crate::query::count_table_rows(&session, "it_pages", "order", &Some("status = 'paid'".into())).await.unwrap();
+    let count = super::query::count_table_rows(&session, "it_pages", "order", &Some("status = 'paid'".into())).await.unwrap();
     assert_eq!(count, 188);
-    let injected = crate::query::fetch_table_page(&session, &request("true); delete from it_pages.\"order\"; select (1", "", 0)).await.unwrap_err();
+    let injected =
+        super::query::fetch_table_page(&session, &request("true); delete from it_pages.\"order\"; select (1", "", 0)).await.unwrap_err();
     assert!(injected.message.contains("single expressions"), "{}", injected.message);
-    assert_eq!(crate::query::count_table_rows(&session, "it_pages", "order", &None).await.unwrap(), 250);
-    let bad = crate::query::fetch_table_page(&session, &request("nope = 1", "", 0)).await.unwrap_err();
+    assert_eq!(super::query::count_table_rows(&session, "it_pages", "order", &None).await.unwrap(), 250);
+    let bad = super::query::fetch_table_page(&session, &request("nope = 1", "", 0)).await.unwrap_err();
     assert_eq!(bad.code.as_deref(), Some("42703"));
 }
 
@@ -234,18 +236,18 @@ async fn generates_ddl_for_tables_views_sequences_and_routines() {
     sessions.open(config("ddl", false), Some(PASSWORD.into())).await.unwrap();
     seed_shop(&sessions, "ddl", "it_ddl").await;
     let session = sessions.get("ddl").unwrap();
-    let table = crate::ddl::object_ddl(&session, "it_ddl", "order", "relation", None).await.unwrap();
+    let table = super::ddl::object_ddl(&session, "it_ddl", "order", "relation", None).await.unwrap();
     assert!(table.starts_with("create table it_ddl.\"order\"\n("), "{table}");
     assert!(table.contains("id bigint generated always as identity not null"), "{table}");
     assert!(table.contains("constraint order_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES it_ddl.customer(id)"), "{table}");
     assert!(table.contains("CREATE INDEX order_status_idx ON it_ddl.\"order\" USING btree (status);"), "{table}");
-    let customer = crate::ddl::object_ddl(&session, "it_ddl", "customer", "relation", None).await.unwrap();
+    let customer = super::ddl::object_ddl(&session, "it_ddl", "customer", "relation", None).await.unwrap();
     assert!(customer.contains("comment on table it_ddl.customer is 'People who buy things';"), "{customer}");
-    let view = crate::ddl::object_ddl(&session, "it_ddl", "paid_orders", "relation", None).await.unwrap();
+    let view = super::ddl::object_ddl(&session, "it_ddl", "paid_orders", "relation", None).await.unwrap();
     assert!(view.starts_with("create or replace view it_ddl.paid_orders as\n"), "{view}");
-    let sequence = crate::ddl::object_ddl(&session, "it_ddl", "invoice_seq", "sequence", None).await.unwrap();
+    let sequence = super::ddl::object_ddl(&session, "it_ddl", "invoice_seq", "sequence", None).await.unwrap();
     assert!(sequence.contains("start with 1000"), "{sequence}");
-    let routine = crate::ddl::object_ddl(&session, "it_ddl", "order_count", "routine", Some("c integer")).await.unwrap();
+    let routine = super::ddl::object_ddl(&session, "it_ddl", "order_count", "routine", Some("c integer")).await.unwrap();
     assert!(routine.starts_with("CREATE OR REPLACE FUNCTION it_ddl.order_count(c integer)"), "{routine}");
 }
 
@@ -260,14 +262,21 @@ async fn table_tabs_give_up_on_locked_tables_instead_of_hanging() {
     rows(&sessions, "locker", "begin").await;
     rows(&sessions, "locker", "lock table lock_check in access exclusive mode").await;
     let started = std::time::Instant::now();
-    let request = crate::query::TablePageRequest { schema: "public".into(), table: "lock_check".into(), filter: None, order_by: None, limit: 100, offset: 0 };
-    let error = crate::query::fetch_table_page(&sessions.get("viewer").unwrap(), &request).await.unwrap_err();
+    let request = super::query::TablePageRequest {
+        schema: "public".into(),
+        table: "lock_check".into(),
+        filter: None,
+        order_by: None,
+        limit: 100,
+        offset: 0,
+    };
+    let error = super::query::fetch_table_page(&sessions.get("viewer").unwrap(), &request).await.unwrap_err();
     let waited = started.elapsed();
     rows(&sessions, "locker", "rollback").await;
     assert_eq!(error.code.as_deref(), Some("55P03"), "{}", error.message);
     assert!(error.message.contains("locked by another session"), "{}", error.message);
     assert!(waited < Duration::from_secs(8), "gave up after {waited:?}");
-    let count = crate::query::count_table_rows(&sessions.get("viewer").unwrap(), "public", "lock_check", &None).await.unwrap();
+    let count = super::query::count_table_rows(&sessions.get("viewer").unwrap(), "public", "lock_check", &None).await.unwrap();
     assert_eq!(count, 0);
 }
 
@@ -292,7 +301,7 @@ async fn stop_cancels_a_slow_table_page() {
     let running = {
         let sessions = sessions.clone();
         tokio::spawn(async move {
-            let request = crate::query::TablePageRequest {
+            let request = super::query::TablePageRequest {
                 schema: "pg_catalog".into(),
                 table: "pg_class".into(),
                 filter: Some("pg_sleep(20) is not null".into()),
@@ -300,7 +309,7 @@ async fn stop_cancels_a_slow_table_page() {
                 limit: 10,
                 offset: 0,
             };
-            crate::query::fetch_table_page(&sessions.get("stop").unwrap(), &request).await
+            super::query::fetch_table_page(&sessions.get("stop").unwrap(), &request).await
         })
     };
     tokio::time::sleep(Duration::from_millis(400)).await;
@@ -309,6 +318,6 @@ async fn stop_cancels_a_slow_table_page() {
     let error = running.await.unwrap().unwrap_err();
     assert_eq!(error.code.as_deref(), Some("57014"));
     assert!(started.elapsed() < Duration::from_secs(3));
-    let after = crate::query::count_table_rows(&sessions.get("stop").unwrap(), "pg_catalog", "pg_am", &None).await.unwrap();
+    let after = super::query::count_table_rows(&sessions.get("stop").unwrap(), "pg_catalog", "pg_am", &None).await.unwrap();
     assert!(after > 0, "meta connection usable after a stop");
 }

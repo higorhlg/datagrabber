@@ -2,9 +2,9 @@
 
 use std::sync::Mutex;
 
+use super::{read_json, write_json};
 use crate::error::{CommandError, CommandResult};
 use crate::model::SavedQuery;
-use crate::store::{read_json, write_json};
 
 const FILE: &str = "saved_queries.json";
 

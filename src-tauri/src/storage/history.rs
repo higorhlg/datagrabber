@@ -2,9 +2,9 @@
 
 use std::sync::Mutex;
 
+use super::{read_json, write_json};
 use crate::error::CommandResult;
 use crate::model::HistoryEntry;
-use crate::store::{read_json, write_json};
 
 const FILE: &str = "history.json";
 const MAX_ENTRIES: usize = 2000;

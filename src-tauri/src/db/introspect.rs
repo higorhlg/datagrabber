@@ -5,11 +5,12 @@
 
 use std::collections::HashMap;
 
+use super::session::{Session, describe_pg_error};
 use crate::error::{CommandError, CommandResult};
 use crate::model::{ColumnInfo, DatabaseSchema, ForeignKeyInfo, IndexInfo, RelationInfo, RoutineInfo, SchemaInfo};
-use crate::session::{Session, describe_pg_error};
 
-const HIDDEN_SCHEMAS: &str = "n.nspname not in ('pg_catalog', 'information_schema') and n.nspname not like 'pg\\_toast%' and n.nspname not like 'pg\\_temp\\_%'";
+const HIDDEN_SCHEMAS: &str =
+    "n.nspname not in ('pg_catalog', 'information_schema') and n.nspname not like 'pg\\_toast%' and n.nspname not like 'pg\\_temp\\_%'";
 
 fn schemas_sql() -> String {
     format!("select n.nspname::text from pg_namespace n where {HIDDEN_SCHEMAS} order by 1")
@@ -155,13 +156,20 @@ pub async fn introspect(session: &Session) -> CommandResult<DatabaseSchema> {
     )
     .map_err(pg_error)?;
 
-    let mut schemas: Vec<SchemaInfo> =
-        schema_rows.iter().map(|r| SchemaInfo { name: r.get(0), relations: Vec::new(), sequences: Vec::new(), routines: Vec::new() }).collect();
+    let mut schemas: Vec<SchemaInfo> = schema_rows
+        .iter()
+        .map(|r| SchemaInfo { name: r.get(0), relations: Vec::new(), sequences: Vec::new(), routines: Vec::new() })
+        .collect();
     add_relations(&mut schemas, &column_rows);
     let positions = relation_positions(&schemas);
     for row in &index_rows {
         if let Some(&(s, r)) = positions.get(&(row.get(0), row.get(1))) {
-            schemas[s].relations[r].indexes.push(IndexInfo { name: row.get(2), unique: row.get(3), primary: row.get(4), definition: row.get(5) });
+            schemas[s].relations[r].indexes.push(IndexInfo {
+                name: row.get(2),
+                unique: row.get(3),
+                primary: row.get(4),
+                definition: row.get(5),
+            });
         }
     }
     for row in &fk_rows {
@@ -175,7 +183,11 @@ pub async fn introspect(session: &Session) -> CommandResult<DatabaseSchema> {
     }
     for row in &routine_rows {
         let index = schema_index(&mut schemas, row.get(0));
-        schemas[index].routines.push(RoutineInfo { name: row.get(1), arguments: row.get(2), kind: routine_kind(row.get::<_, Option<&str>>(3)) });
+        schemas[index].routines.push(RoutineInfo {
+            name: row.get(1),
+            arguments: row.get(2),
+            kind: routine_kind(row.get::<_, Option<&str>>(3)),
+        });
     }
     let search_path: Vec<String> = path_rows.first().map(|r| r.get(0)).unwrap_or_else(|| vec!["public".to_string()]);
     Ok(DatabaseSchema { schemas, search_path })

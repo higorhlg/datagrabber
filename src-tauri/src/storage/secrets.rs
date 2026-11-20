@@ -97,10 +97,12 @@ pub fn read_external(service: &str, account: &str) -> ExternalSecret {
 fn read_external_by_service(service: &str) -> ExternalSecret {
     use security_framework::item::{ItemClass, ItemSearchOptions, Limit, SearchResult};
     const ERR_SEC_ITEM_NOT_FOUND: i32 = -25300;
-    let found = ItemSearchOptions::new().class(ItemClass::generic_password()).service(service).load_data(true).limit(Limit::Max(1)).search();
+    let found =
+        ItemSearchOptions::new().class(ItemClass::generic_password()).service(service).load_data(true).limit(Limit::Max(1)).search();
     match found {
         Ok(results) => match results.into_iter().next() {
-            Some(SearchResult::Data(bytes)) => String::from_utf8(bytes).map_or_else(|_| ExternalSecret::Unavailable("The saved password is not valid text".to_string()), ExternalSecret::Found),
+            Some(SearchResult::Data(bytes)) => String::from_utf8(bytes)
+                .map_or_else(|_| ExternalSecret::Unavailable("The saved password is not valid text".to_string()), ExternalSecret::Found),
             _ => ExternalSecret::NotFound,
         },
         Err(error) if error.code() == ERR_SEC_ITEM_NOT_FOUND => ExternalSecret::NotFound,

@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-  datagrabber_lib::run();
+    datagrabber_lib::run();
 }

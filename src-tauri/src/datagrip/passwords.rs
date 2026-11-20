@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use crate::error::CommandResult;
 use crate::model::ConnectionConfig;
-use crate::secrets::ExternalSecret;
+use crate::storage::secrets::ExternalSecret;
 
 /// Keychain service name DataGrip (IntelliJ Platform) uses for a data source's password.
 pub fn datagrip_keychain_service(data_source_uuid: &str) -> String {
@@ -37,7 +37,12 @@ pub fn copy_passwords(
     connections
         .iter()
         .map(|connection| {
-            let result = |status: &'static str, message: Option<String>| PasswordCopyResult { id: connection.id.clone(), name: connection.name.clone(), status, message };
+            let result = |status: &'static str, message: Option<String>| PasswordCopyResult {
+                id: connection.id.clone(),
+                name: connection.name.clone(),
+                status,
+                message,
+            };
             let Some(uuid) = &connection.datagrip_uuid else {
                 return result("not-imported", Some("Not imported from DataGrip".to_string()));
             };
@@ -100,7 +105,10 @@ mod tests {
             Ok(())
         });
         let statuses: Vec<_> = results.iter().map(|r| (r.id.as_str(), r.status)).collect();
-        assert_eq!(statuses, vec![("a", "copied"), ("b", "not-found"), ("c", "already-saved"), ("d", "not-imported"), ("e", "unavailable")]);
+        assert_eq!(
+            statuses,
+            vec![("a", "copied"), ("b", "not-found"), ("c", "already-saved"), ("d", "not-imported"), ("e", "unavailable")]
+        );
         assert_eq!(saved, vec![("a".to_string(), "s3cret".to_string())]);
         assert!(results.iter().all(|r| !format!("{r:?}").contains("s3cret")), "results must never carry the password");
     }

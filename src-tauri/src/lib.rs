@@ -1,57 +1,54 @@
+//! Datagrabber backend: a Tauri app exposing PostgreSQL access to the web UI.
+//!
+//! - `commands`: the UI's API (thin Tauri command adapters)
+//! - `db`: sessions, statement execution, introspection, DDL
+//! - `storage`: connections, consoles, history, saved queries (JSON files) and keychain secrets
+//! - `datagrip`: importing DataGrip data sources and their saved passwords
+//! - `model`: the serialized shapes shared with the UI
+
 mod commands;
-mod connections;
 mod datagrip;
-mod ddl;
+mod db;
 mod error;
-mod history;
-mod introspect;
 mod model;
-mod password_import;
-mod query;
-mod saved;
-mod secrets;
-mod session;
-mod store;
+mod storage;
 
-#[cfg(test)]
-mod integration_tests;
-
-use session::Sessions;
+use db::session::Sessions;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(Sessions::default())
         .invoke_handler(tauri::generate_handler![
-            commands::list_connections,
-            commands::create_connection,
-            commands::update_connection,
-            commands::delete_connection,
-            commands::test_connection,
-            commands::connect,
-            commands::disconnect,
-            commands::forget_password,
-            commands::schema,
-            commands::run_query,
-            commands::cancel_query,
-            commands::table_page,
-            commands::table_count,
-            commands::cancel_table_query,
-            commands::object_ddl,
-            commands::list_saved_queries,
-            commands::save_query,
-            commands::rename_saved_query,
-            commands::delete_saved_query,
-            commands::list_history,
-            commands::load_console,
-            commands::save_console,
-            commands::preview_datagrip,
-            commands::import_datagrip,
-            commands::copy_datagrip_passwords,
-            commands::save_export,
-            commands::e2e_config,
-            commands::e2e_log,
-            commands::e2e_report,
+            commands::connections::list_connections,
+            commands::connections::create_connection,
+            commands::connections::update_connection,
+            commands::connections::delete_connection,
+            commands::connections::test_connection,
+            commands::connections::connect,
+            commands::connections::disconnect,
+            commands::connections::forget_password,
+            commands::explorer::schema,
+            commands::explorer::object_ddl,
+            commands::queries::run_query,
+            commands::queries::cancel_query,
+            commands::queries::table_page,
+            commands::queries::table_count,
+            commands::queries::cancel_table_query,
+            commands::library::list_history,
+            commands::library::list_saved_queries,
+            commands::library::save_query,
+            commands::library::rename_saved_query,
+            commands::library::delete_saved_query,
+            commands::library::load_console,
+            commands::library::save_console,
+            commands::library::save_export,
+            commands::datagrip::preview_datagrip,
+            commands::datagrip::import_datagrip,
+            commands::datagrip::copy_datagrip_passwords,
+            commands::testing::e2e_config,
+            commands::testing::e2e_log,
+            commands::testing::e2e_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running datagrabber");

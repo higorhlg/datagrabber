@@ -16,7 +16,7 @@ use tokio_postgres::{CancelToken, Client, Config, SimpleQueryMessage};
 
 use crate::error::{CommandError, CommandResult};
 use crate::model::{ConnectionConfig, SslMode};
-use crate::secrets;
+use crate::storage::secrets;
 
 const READ_ONLY_SQL: &str = "set session characteristics as transaction read only";
 
@@ -89,7 +89,12 @@ fn pg_config(config: &ConnectionConfig, password: &str) -> Config {
 
 /// Opens one connection, drives it on a background task, and applies read-only mode when configured.
 /// `broken` flips to true when the connection ends.
-async fn open_client(config: &ConnectionConfig, password: &str, tls: &MakeTlsConnector, broken: Arc<AtomicBool>) -> Result<Client, tokio_postgres::Error> {
+async fn open_client(
+    config: &ConnectionConfig,
+    password: &str,
+    tls: &MakeTlsConnector,
+    broken: Arc<AtomicBool>,
+) -> Result<Client, tokio_postgres::Error> {
     let (client, connection) = pg_config(config, password).connect(tls.clone()).await?;
     tokio::spawn(async move {
         let _ = connection.await;

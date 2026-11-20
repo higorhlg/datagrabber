@@ -13,9 +13,9 @@ use futures_util::{StreamExt, pin_mut};
 use tokio_postgres::error::ErrorPosition;
 use tokio_postgres::{Client, SimpleQueryMessage, SimpleQueryRow};
 
+use super::ddl::quote_ident;
+use super::session::{Session, describe_pg_error};
 use crate::model::{QueryError, QueryResult, ResultColumn};
-use crate::ddl::quote_ident;
-use crate::session::{Session, describe_pg_error};
 
 const CURSOR: &str = "datagrabber_cursor";
 /// True inside a transaction block: there, the transaction started before this statement did.
@@ -116,10 +116,19 @@ fn row_values(row: &SimpleQueryRow) -> Vec<Option<String>> {
 }
 
 /// Runs a statement through a cursor, fetching at most `max_rows + 1` rows to detect truncation.
-async fn run_with_cursor(client: &Client, sql: &str, max_rows: usize, in_transaction: bool) -> Result<(Vec<Vec<Option<String>>>, bool), QueryError> {
+async fn run_with_cursor(
+    client: &Client,
+    sql: &str,
+    max_rows: usize,
+    in_transaction: bool,
+) -> Result<(Vec<Vec<Option<String>>>, bool), QueryError> {
     let begin = if in_transaction { "" } else { "BEGIN;\n" };
     let prefix = format!("{begin}DECLARE {CURSOR} NO SCROLL CURSOR FOR\n");
-    let batch = format!("{prefix}{sql}\n;\nFETCH FORWARD {} FROM {CURSOR};\nCLOSE {CURSOR}{}", max_rows + 1, if in_transaction { "" } else { ";\nCOMMIT" });
+    let batch = format!(
+        "{prefix}{sql}\n;\nFETCH FORWARD {} FROM {CURSOR};\nCLOSE {CURSOR}{}",
+        max_rows + 1,
+        if in_transaction { "" } else { ";\nCOMMIT" }
+    );
     match client.simple_query(&batch).await {
         Ok(messages) => {
             let mut rows: Vec<Vec<Option<String>>> = messages
@@ -184,7 +193,9 @@ pub async fn run_statement(session: &Session, sql: &str, max_rows: usize) -> Res
     };
     let typed_columns: Vec<ResultColumn> = statement
         .as_ref()
-        .map(|s| s.columns().iter().map(|c| ResultColumn { name: c.name().to_string(), type_name: display_type(c.type_().name()) }).collect())
+        .map(|s| {
+            s.columns().iter().map(|c| ResultColumn { name: c.name().to_string(), type_name: display_type(c.type_().name()) }).collect()
+        })
         .unwrap_or_default();
     drop(statement);
 
@@ -195,7 +206,11 @@ pub async fn run_statement(session: &Session, sql: &str, max_rows: usize) -> Res
         (typed_columns, rows, truncated, count)
     } else {
         let (names, rows, truncated, count) = run_simple(&client, sql, max_rows).await?;
-        let columns = if names.len() == typed_columns.len() { typed_columns } else { names.into_iter().map(|name| ResultColumn { name, type_name: String::new() }).collect() };
+        let columns = if names.len() == typed_columns.len() {
+            typed_columns
+        } else {
+            names.into_iter().map(|name| ResultColumn { name, type_name: String::new() }).collect()
+        };
         (columns, rows, truncated, count)
     };
     Ok(QueryResult {
@@ -255,13 +270,14 @@ fn explain_meta_timeouts(mut error: QueryError) -> QueryError {
         Some("55P03") => {
             error.message = format!(
                 "The table is locked by another session (for example a migration), so this stopped after {}s instead of waiting.",
-                crate::session::META_LOCK_TIMEOUT_SECS
+                super::session::META_LOCK_TIMEOUT_SECS
             );
             error.hint = Some("Try again in a moment, or check pg_locks / pg_stat_activity for the blocker.".to_string());
         }
         Some("57014") if error.message.contains("statement timeout") => {
-            error.message = format!("Stopped after {}s to avoid a long-running query.", crate::session::META_STATEMENT_TIMEOUT_SECS);
-            error.hint = Some("Add a filter, sort by an indexed column, or run it from a console (no time limit, cancellable).".to_string());
+            error.message = format!("Stopped after {}s to avoid a long-running query.", super::session::META_STATEMENT_TIMEOUT_SECS);
+            error.hint =
+                Some("Add a filter, sort by an indexed column, or run it from a console (no time limit, cancellable).".to_string());
         }
         Some("57014") => {
             error.message = "Stopped.".to_string();
@@ -294,7 +310,14 @@ pub async fn fetch_table_page(session: &Session, request: &TablePageRequest) -> 
     let columns = prepare_generated(&session.meta, &sql).await.map_err(explain_meta_timeouts)?;
     let (_, rows, truncated, _) = run_simple(&session.meta, &sql, request.limit).await.map_err(explain_meta_timeouts)?;
     let count = rows.len() as u64;
-    Ok(QueryResult { columns, rows, truncated, command: "SELECT".to_string(), row_count: Some(count), duration_ms: started.elapsed().as_millis() as u64 })
+    Ok(QueryResult {
+        columns,
+        rows,
+        truncated,
+        command: "SELECT".to_string(),
+        row_count: Some(count),
+        duration_ms: started.elapsed().as_millis() as u64,
+    })
 }
 
 /// Counts the rows matching a table tab's filter.

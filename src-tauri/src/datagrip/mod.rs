@@ -1,5 +1,8 @@
-//! Imports connection metadata from a DataGrip project (.idea/dataSources.xml + dataSources.local.xml).
-//! DataGrip's encrypted password store is never opened: passwords are asked on first connect.
+//! DataGrip interoperability: importing data sources from a project's .idea/dataSources.xml +
+//! dataSources.local.xml (connection metadata only), and copying the passwords DataGrip saved in
+//! the macOS Keychain (`passwords`, which asks the user to allow each item).
+
+pub mod passwords;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -14,11 +17,7 @@ pub fn default_dir() -> PathBuf {
 
 /// Child element text of a data-source element, trimmed; None when absent or empty.
 fn child_text(node: roxmltree::Node, name: &str) -> Option<String> {
-    node.children()
-        .find(|c| c.has_tag_name(name))
-        .and_then(|c| c.text())
-        .map(|t| t.trim().to_string())
-        .filter(|t| !t.is_empty())
+    node.children().find(|c| c.has_tag_name(name)).and_then(|c| c.text()).map(|t| t.trim().to_string()).filter(|t| !t.is_empty())
 }
 
 /// A data source's fields that matter for import.
@@ -190,7 +189,13 @@ mod tests {
     fn parses_jdbc_urls() {
         assert_eq!(
             parse_postgres_jdbc_url("jdbc:postgresql://db.example.com:6543/orders?sslmode=require&user=app"),
-            Some(JdbcTarget { host: "db.example.com".into(), port: 6543, database: "orders".into(), ssl_mode: Some(SslMode::Require), user: Some("app".into()) })
+            Some(JdbcTarget {
+                host: "db.example.com".into(),
+                port: 6543,
+                database: "orders".into(),
+                ssl_mode: Some(SslMode::Require),
+                user: Some("app".into())
+            })
         );
         assert_eq!(
             parse_postgres_jdbc_url("jdbc:postgresql://localhost/app"),
@@ -205,7 +210,7 @@ mod tests {
         assert_eq!(color_for_name("SHOP_PROD_ORDERS"), "#dc2626");
         assert_eq!(color_for_name("sub qa"), "#d97706");
         assert_eq!(color_for_name("engine-qa"), "#d97706");
-        assert_eq!(color_for_name("fulfillment-dev"), "#16a34a");
+        assert_eq!(color_for_name("orders-dev"), "#16a34a");
         assert_eq!(color_for_name("quality"), "#64748b");
     }
 

@@ -1,8 +1,8 @@
 //! Saved connections (connections.json).
 
+use super::{read_json, write_json};
 use crate::error::{CommandError, CommandResult};
 use crate::model::{ConnectionConfig, ConnectionInput};
-use crate::store::{read_json, write_json};
 
 const FILE: &str = "connections.json";
 const DEFAULT_COLOR: &str = "#64748b";
@@ -24,7 +24,9 @@ pub fn get(id: &str) -> CommandResult<ConnectionConfig> {
 
 /// Validates form input, trimming text fields.
 pub fn validate(mut input: ConnectionInput) -> CommandResult<ConnectionInput> {
-    for (label, value) in [("name", &mut input.name), ("host", &mut input.host), ("database", &mut input.database), ("user", &mut input.user)] {
+    for (label, value) in
+        [("name", &mut input.name), ("host", &mut input.host), ("database", &mut input.database), ("user", &mut input.user)]
+    {
         *value = value.trim().to_string();
         if value.is_empty() {
             return Err(CommandError::new(format!("{label} is required")));
@@ -59,7 +61,9 @@ pub fn save(input: ConnectionInput, id: Option<&str>) -> CommandResult<Connectio
     let input = validate(input)?;
     let mut connections = list()?;
     let existing = match id {
-        Some(id) => Some(connections.iter().find(|c| c.id == id).cloned().ok_or_else(|| CommandError::new(format!("Unknown connection {id}")))?),
+        Some(id) => {
+            Some(connections.iter().find(|c| c.id == id).cloned().ok_or_else(|| CommandError::new(format!("Unknown connection {id}")))?)
+        }
         None => None,
     };
     let saved = to_config(input, existing.as_ref());
@@ -72,7 +76,8 @@ pub fn save(input: ConnectionInput, id: Option<&str>) -> CommandResult<Connectio
 /// Records whether the keychain holds a password for this connection.
 pub fn set_password_saved(id: &str, saved: bool) -> CommandResult<()> {
     let _guard = WRITE_LOCK.lock().unwrap();
-    let connections: Vec<ConnectionConfig> = list()?.into_iter().map(|c| if c.id == id { ConnectionConfig { password_saved: saved, ..c } } else { c }).collect();
+    let connections: Vec<ConnectionConfig> =
+        list()?.into_iter().map(|c| if c.id == id { ConnectionConfig { password_saved: saved, ..c } } else { c }).collect();
     write_json(FILE, &connections)
 }
 

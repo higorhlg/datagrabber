@@ -1,6 +1,14 @@
-//! Files under the data directory (~/.datagrabber, or $DATAGRABBER_HOME): connections.json,
-//! history.json and consoles/<connection id>.sql. Writes are atomic (temp file + rename) and
-//! owner-only, because consoles and history may contain sensitive SQL.
+//! Local persistence. Everything lives under the data directory (~/.datagrabber, or
+//! $DATAGRABBER_HOME) except passwords, which only ever go to the OS keychain (`secrets`).
+//! Writes are atomic (temp file + rename) and owner-only, because consoles and history may
+//! contain sensitive SQL.
+
+pub mod connections;
+pub mod consoles;
+pub mod exports;
+pub mod history;
+pub mod saved;
+pub mod secrets;
 
 use std::fs;
 use std::io::Write;
@@ -13,9 +21,7 @@ use crate::error::CommandResult;
 
 /// Resolves the data directory.
 pub fn data_dir() -> PathBuf {
-    std::env::var_os("DATAGRABBER_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".datagrabber"))
+    std::env::var_os("DATAGRABBER_HOME").map(PathBuf::from).unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".datagrabber"))
 }
 
 /// Reads a JSON file, returning `fallback` when it does not exist yet.
