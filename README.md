@@ -71,8 +71,8 @@ pnpm install
 pnpm build          # → src-tauri/target/release/bundle/macos/Datagrabber.app
 ```
 
-**Prebuilt:** tagged releases attach a universal `.dmg`. It is not notarized yet; on first launch
-right-click the app → Open.
+**Prebuilt:** pushing a `v*` tag builds a universal (Apple Silicon + Intel) `.dmg` and attaches it to a
+GitHub release; check the Releases page. It is not notarized yet; on first launch right-click the app → Open.
 
 Want a database to try it on? `pnpm sample-db` serves a fake shop on `127.0.0.1:54329` (in-memory
 PGlite, any user/password).
