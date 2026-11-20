@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { toCsv, toInsertSql, toJson, toTsv } from '../../lib/export.ts';
+import { platform } from '../../lib/platform.ts';
 import type { QueryError, QueryResult } from '../../lib/types.ts';
 import { ContextMenu, type MenuItem } from '../../ui/ContextMenu.tsx';
 import { LoadingMessage, ProgressBar } from '../../ui/Loading.tsx';
@@ -52,10 +53,8 @@ export function ResultsPane({ tabs, activeId, onSelect, onSaveFile, notify, onCa
     return (
       <section className="results empty">
         <p className="muted">
-          Run a statement with <kbd>⌘</kbd>
-          <kbd>↵</kbd> (statement at cursor or selection) or <kbd>⇧</kbd>
-          <kbd>⌘</kbd>
-          <kbd>↵</kbd> (whole console).
+          Run a statement with <kbd>{platform.shortcuts.run}</kbd> (statement at cursor or selection) or{' '}
+          <kbd>{platform.shortcuts.runAll}</kbd> (whole console).
         </p>
       </section>
     );

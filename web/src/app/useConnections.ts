@@ -131,7 +131,7 @@ export function useConnections(notify: (message: string) => void) {
     setPrompt(undefined);
   };
 
-  /** Copies DataGrip's Keychain passwords (every imported connection, or the given ones). */
+  /** Copies the passwords DataGrip saved in the OS keychain (every imported connection, or the given ones). */
   const copyDatagripPasswords = async (ids?: string[]): Promise<PasswordCopyResult[]> => {
     setPasswordCopy({ phase: 'running' });
     try {

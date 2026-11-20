@@ -1,4 +1,5 @@
 import { Editor } from '@monaco-editor/react';
+import { MONO_FONT_FAMILY } from '../../lib/fonts.ts';
 import { useEditorTheme } from '../../lib/theme.ts';
 import { LoadingMessage } from '../../ui/Loading.tsx';
 
@@ -25,6 +26,7 @@ export function DdlViewer({ ddl, error }: DdlViewerProps) {
           domReadOnly: true,
           minimap: { enabled: false },
           fontSize: 13,
+          fontFamily: MONO_FONT_FAMILY,
           scrollBeyondLastLine: false,
           automaticLayout: true,
           renderLineHighlight: 'none',

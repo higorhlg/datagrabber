@@ -16,6 +16,7 @@ import { PropertiesDialog } from './features/explorer/PropertiesDialog.tsx';
 import { DdlTab } from './features/table/DdlTab.tsx';
 import { TableView } from './features/table/TableView.tsx';
 import { api } from './lib/api.ts';
+import { platform } from './lib/platform.ts';
 import type { ConnectionConfig, ConnectionSummary, RelationInfo } from './lib/types.ts';
 import { Modal } from './ui/Modal.tsx';
 
@@ -119,7 +120,10 @@ export function App() {
           <div className="welcome">
             <h1>datagrabber</h1>
             <p className="muted">Click a table in the explorer to open it, or double-click a connection for a query console.</p>
-            <p className="muted small">⌘↵ runs the statement at the cursor · ⇧⌘↵ runs everything · ★ saves a query for later</p>
+            <p className="muted small">
+              {platform.shortcuts.run} runs the statement at the cursor · {platform.shortcuts.runAll} runs everything · ★ saves a query for
+              later
+            </p>
           </div>
         ) : (
           <>

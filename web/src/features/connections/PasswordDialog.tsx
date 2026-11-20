@@ -1,4 +1,5 @@
 import { type FormEvent, useState } from 'react';
+import { platform } from '../../lib/platform.ts';
 import type { ConnectionConfig } from '../../lib/types.ts';
 import { Modal } from '../../ui/Modal.tsx';
 
@@ -6,7 +7,7 @@ type PasswordDialogProps = {
   connection: ConnectionConfig;
   error?: string;
   onSubmit: (password: string, savePassword: boolean) => void;
-  /** Shown for DataGrip imports: copy DataGrip's saved password from the Keychain, then connect. */
+  /** Shown for DataGrip imports: copy DataGrip's saved password from the OS keychain, then connect. */
   onUseDatagrip?: () => void;
   onCancel: () => void;
 };
@@ -45,14 +46,14 @@ export function PasswordDialog({ connection, error, onSubmit, onUseDatagrip, onC
         </label>
         <label className="check span-2">
           <input type="checkbox" checked={save} onChange={(e) => setSave(e.target.checked)} />
-          Save in macOS Keychain
+          Save in {platform.keychain}
         </label>
         {onUseDatagrip && (
           <p className="span-2 small">
             <button type="button" className="link" onClick={onUseDatagrip} data-testid="use-datagrip-password">
               Use the password saved in DataGrip
             </button>
-            <span className="muted"> — macOS will ask you to allow access.</span>
+            <span className="muted"> — {platform.accessPrompt}</span>
           </p>
         )}
       </form>
