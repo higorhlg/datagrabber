@@ -20,6 +20,8 @@ const server = new EmbeddedPostgres({
   user: 'postgres',
   password: PASSWORD,
   persistent: false,
+  // pnpm skips dependency install scripts, which create the Linux binaries' library symlinks.
+  autoRehydrateSymlinks: true,
   onLog: () => undefined,
   onError: () => undefined,
 });

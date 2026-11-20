@@ -28,7 +28,7 @@
   --ic-schema: #8f9aae;
   --ic-fn: #b56ed6;
   --ic-seq: #49a38b;
-  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, "DejaVu Sans Mono", "Liberation Mono", monospace;
   color-scheme: light;
 }
 
@@ -82,6 +82,9 @@ body {
     BlinkMacSystemFont,
     "Inter",
     "Segoe UI",
+    "Cantarell",
+    "Ubuntu",
+    "Noto Sans",
     sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;

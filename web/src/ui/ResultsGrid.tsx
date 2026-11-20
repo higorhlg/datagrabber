@@ -52,7 +52,7 @@ function compareCells(a: string | null, b: string | null, numeric: boolean): num
 
 /**
  * Read-only results grid: virtualized rows, sortable headers (locally, or by the server for table
- * tabs), cell selection with arrow keys, ⌘C copy, Enter/double-click to open a value.
+ * tabs), cell selection with arrow keys, Cmd/Ctrl+C copy, Enter/double-click to open a value.
  */
 export function ResultsGrid({
   result,

@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from 'react';
 import { ApiError, api } from '../../lib/api.ts';
+import { platform } from '../../lib/platform.ts';
 import type { ConnectionConfig, ConnectionInput, SslMode } from '../../lib/types.ts';
 import { Modal } from '../../ui/Modal.tsx';
 
@@ -113,7 +114,7 @@ export function ConnectionDialog({ connection, onClose, onSaved }: ConnectionDia
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
-            placeholder={connection?.passwordSaved ? 'Saved in Keychain — leave blank to keep' : 'Asked on connect if blank'}
+            placeholder={connection?.passwordSaved ? `Saved in ${platform.keychain} — leave blank to keep` : 'Asked on connect if blank'}
           />
         </label>
         <label>
@@ -127,7 +128,7 @@ export function ConnectionDialog({ connection, onClose, onSaved }: ConnectionDia
         </label>
         <label className="check span-2">
           <input type="checkbox" checked={savePassword} disabled={!password} onChange={(e) => setSavePassword(e.target.checked)} />
-          Save password in macOS Keychain
+          Save password in {platform.keychain}
         </label>
         <label className="check span-2">
           <input type="checkbox" checked={form.readOnly} onChange={(e) => set('readOnly', e.target.checked)} />

@@ -1,4 +1,5 @@
-//! Connection passwords in the OS keychain (service "datagrabber", account = connection id).
+//! Connection passwords in the OS keychain (service "datagrabber", account = connection id):
+//! the macOS Keychain, or the Secret Service (GNOME Keyring, KWallet…) on Linux.
 //! With DATAGRABBER_SECRETS=memory they stay in process memory instead, which tests use so they
 //! never touch the real keychain (and other apps' items can be faked for the end-to-end test).
 
@@ -70,12 +71,12 @@ pub fn delete(id: &str) -> CommandResult<()> {
 pub enum ExternalSecret {
     Found(String),
     NotFound,
-    /// The user declined the macOS access prompt, or the keychain refused for another reason.
+    /// The user declined the OS access or unlock prompt, or the keychain refused for another reason.
     Unavailable(String),
 }
 
 /// Reads a password stored by another application (e.g. DataGrip) under `service` / `account`.
-/// macOS shows its own prompt asking the user to allow access to that item. The value is returned
+/// The OS shows its own prompt asking the user to allow access to (or unlock) that item. The value is returned
 /// to the caller only; it is never logged.
 pub fn read_external(service: &str, account: &str) -> ExternalSecret {
     if let Some(store) = memory() {
@@ -110,7 +111,35 @@ fn read_external_by_service(service: &str) -> ExternalSecret {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+/// Fallback when no item matches the account: the first Secret Service item (GNOME Keyring,
+/// KWallet…) whose `service` attribute matches, whatever account it was saved under. Unlocking a
+/// locked item makes the desktop ask the user.
+#[cfg(target_os = "linux")]
+fn read_external_by_service(service: &str) -> ExternalSecret {
+    use dbus_secret_service::{EncryptionType, SecretService};
+    let unavailable = |error: dbus_secret_service::Error| ExternalSecret::Unavailable(error.to_string());
+    let secret_service = match SecretService::connect(EncryptionType::Dh) {
+        Ok(connection) => connection,
+        Err(error) => return unavailable(error),
+    };
+    let found = match secret_service.search_items(HashMap::from([("service", service)])) {
+        Ok(found) => found,
+        Err(error) => return unavailable(error),
+    };
+    let Some(item) = found.unlocked.into_iter().chain(found.locked).next() else {
+        return ExternalSecret::NotFound;
+    };
+    if let Err(error) = item.unlock() {
+        return unavailable(error);
+    }
+    match item.get_secret() {
+        Ok(bytes) => String::from_utf8(bytes)
+            .map_or_else(|_| ExternalSecret::Unavailable("The saved password is not valid text".to_string()), ExternalSecret::Found),
+        Err(error) => unavailable(error),
+    }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 fn read_external_by_service(_service: &str) -> ExternalSecret {
     ExternalSecret::NotFound
 }

@@ -3,8 +3,10 @@ import { History as HistoryIcon, ListVideo, Play, Square, Star } from 'lucide-re
 import type * as Monaco from 'monaco-editor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, api, type RunResponse } from '../../lib/api.ts';
+import { MONO_FONT_FAMILY } from '../../lib/fonts.ts';
 import { setModelSchema } from '../../lib/monaco/completion.ts';
 import { monaco } from '../../lib/monaco/setup.ts';
+import { platform } from '../../lib/platform.ts';
 import { type SqlStatement, splitSql, statementAt } from '../../lib/sql/split.ts';
 import { useEditorTheme } from '../../lib/theme.ts';
 import type { ConnectionSummary, DatabaseSchema } from '../../lib/types.ts';
@@ -186,7 +188,7 @@ export function ConsoleView({
     }
   };
 
-  /** ⌘↵: runs the selection's statements, or the statement under the cursor. */
+  /** Cmd/Ctrl+Enter: runs the selection's statements, or the statement under the cursor. */
   const runCurrent = () => {
     const editor = editorRef.current;
     const model = editor?.getModel();
@@ -206,13 +208,13 @@ export function ConsoleView({
     if (statement) runStatements([statement], true);
   };
 
-  /** ⇧⌘↵: runs every statement in the console. */
+  /** Shift+Cmd/Ctrl+Enter: runs every statement in the console. */
   const runAll = () => {
     const text = editorRef.current?.getModel()?.getValue() ?? '';
     runStatements(splitSql(text), true);
   };
 
-  /** The selection, or the statement under the cursor: what ⌘↵ would run. */
+  /** The selection, or the statement under the cursor: what Cmd/Ctrl+Enter would run. */
   const currentSql = (): string | undefined => {
     const editor = editorRef.current;
     const model = editor?.getModel();
@@ -316,12 +318,19 @@ export function ConsoleView({
           className="primary run"
           onClick={runCurrent}
           disabled={running}
-          title="Run statement at cursor or selection (⌘↵)"
+          title={`Run statement at cursor or selection (${platform.shortcuts.run})`}
           data-testid="run"
         >
           <Play size={13} fill="currentColor" /> Run
         </button>
-        <button type="button" className="tool" onClick={runAll} disabled={running} title="Run all statements (⇧⌘↵)" data-testid="run-all">
+        <button
+          type="button"
+          className="tool"
+          onClick={runAll}
+          disabled={running}
+          title={`Run all statements (${platform.shortcuts.runAll})`}
+          data-testid="run-all"
+        >
           <ListVideo size={16} />
         </button>
         <button
@@ -389,6 +398,7 @@ export function ConsoleView({
                 onChange={(value) => persist(value ?? '')}
                 options={{
                   fontSize: 13,
+                  fontFamily: MONO_FONT_FAMILY,
                   minimap: { enabled: false },
                   scrollBeyondLastLine: false,
                   automaticLayout: true,

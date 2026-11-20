@@ -1,5 +1,6 @@
 import { CheckCircle2, CircleSlash, KeyRound, ShieldAlert } from 'lucide-react';
 import type { PasswordCopyResult } from '../../lib/api.ts';
+import { platform } from '../../lib/platform.ts';
 import { Modal } from '../../ui/Modal.tsx';
 
 export type PasswordCopyState = { phase: 'confirm' } | { phase: 'running' } | { phase: 'done'; results: PasswordCopyResult[] };
@@ -13,15 +14,15 @@ type PasswordCopyDialogProps = {
 };
 
 const STATUS_TEXT: Record<PasswordCopyResult['status'], string> = {
-  copied: "Copied to Datagrabber's Keychain entry",
+  copied: `Copied to Datagrabber's entry in the ${platform.keychain}`,
   'already-saved': 'Already has a saved password (skipped)',
   'not-found': 'No password saved in DataGrip',
   'not-imported': 'Not imported from DataGrip',
-  unavailable: 'Not copied — access was denied or the Keychain is unavailable',
+  unavailable: `Not copied — access was denied or the ${platform.keychain} is unavailable`,
   error: 'Could not save',
 };
 
-/** Explains, runs and reports copying DataGrip's Keychain passwords into Datagrabber. */
+/** Explains, runs and reports copying the passwords DataGrip saved in the OS keychain into Datagrabber. */
 export function PasswordCopyDialog({ state, pendingCount, onStart, onClose }: PasswordCopyDialogProps) {
   const copied = state.phase === 'done' ? state.results.filter((r) => r.status === 'copied').length : 0;
   return (
@@ -52,23 +53,29 @@ export function PasswordCopyDialog({ state, pendingCount, onStart, onClose }: Pa
       {state.phase === 'confirm' && (
         <div className="copy-explainer">
           <p>
-            <KeyRound size={14} className="ic-key" /> DataGrip keeps your database passwords in the macOS Keychain. Datagrabber can copy
-            them into its own Keychain entries so your imported connections open without typing them.
+            <KeyRound size={14} className="ic-key" /> DataGrip keeps your database passwords in the {platform.keychain}. Datagrabber can
+            copy them into its own entries there so your imported connections open without typing them.
           </p>
           <ul>
             <li>
-              macOS asks you to <strong>Allow</strong> each DataGrip item. Click <em>Allow</em> (or <em>Always Allow</em>); <em>Deny</em>{' '}
-              skips that connection.
+              {platform.isMac ? (
+                <>
+                  macOS asks you to <strong>Allow</strong> each DataGrip item. Click <em>Allow</em> (or <em>Always Allow</em>);{' '}
+                  <em>Deny</em> skips that connection.
+                </>
+              ) : (
+                <>Your keyring may ask you to unlock it first; cancelling skips the remaining connections.</>
+              )}
             </li>
             <li>
-              Passwords go straight from one Keychain item to another inside the app. They are never shown, logged or written to files.
+              Passwords go straight from one keyring item to another inside the app. They are never shown, logged or written to files.
             </li>
             <li>Connections that already have a saved password are left alone.</li>
           </ul>
           {pendingCount === 0 && <p className="muted">Every imported connection already has a saved password.</p>}
         </div>
       )}
-      {state.phase === 'running' && <p className="muted">Copying… answer the macOS Keychain prompts as they appear.</p>}
+      {state.phase === 'running' && <p className="muted">Copying… answer the {platform.keychain} prompts as they appear.</p>}
       {state.phase === 'done' && (
         <>
           <p>

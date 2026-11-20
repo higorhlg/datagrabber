@@ -1,6 +1,7 @@
-//! Copies connection passwords that DataGrip saved in the macOS Keychain into Datagrabber's own
-//! keychain entries. Values move from one keychain item to another inside this process; they are
-//! never returned to the UI or logged. macOS asks the user to allow each DataGrip item.
+//! Copies connection passwords that DataGrip saved in the OS keychain (macOS Keychain, or the
+//! Secret Service on Linux) into Datagrabber's own keychain entries. Values move from one keychain
+//! item to another inside this process; they are never returned to the UI or logged. The OS asks
+//! the user to allow (macOS) or unlock (Linux) access to DataGrip's items.
 
 use serde::Serialize;
 
