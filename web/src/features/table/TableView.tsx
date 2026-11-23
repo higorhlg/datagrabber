@@ -43,6 +43,7 @@ type Loaded = { result: QueryResult; sql: string };
  * on screen (dimmed) so paging, sorting and filtering never flash an empty grid.
  */
 type Page =
+  | { status: 'idle' }
   | { status: 'connecting' }
   | { status: 'loading'; previous?: Loaded }
   | ({ status: 'done' } & Loaded)
@@ -66,7 +67,8 @@ function parseSimpleOrder(orderBy: string): ServerSort {
 
 /**
  * A table or view opened from the explorer: pages of rows with WHERE / ORDER BY bars, header
- * sorting, row count on demand, export, and its DDL. Runs on the explorer connection, which gives
+ * sorting, row count on demand, export, and its DDL. Opens idle: no rows are fetched until Enter
+ * in the WHERE / ORDER BY bar or Reload asks for them, so a query can be built first. Runs on the explorer connection, which gives
  * up on locks after 5 s and on any statement after 30 s, so opening a table never hangs; Stop
  * cancels a slow page sooner. Loading keeps the last page visible (dimmed) under a progress bar.
  */
@@ -87,7 +89,8 @@ export function TableView({
   const [applied, setApplied] = useState({ filter: '', orderBy: '' });
   const [offset, setOffset] = useState(0);
   const [pageSize, setPageSize] = useState(500);
-  const [page, setPage] = useState<Page>({ status: connection.connected ? 'loading' : 'connecting' });
+  const [page, setPage] = useState<Page>({ status: 'idle' });
+  const [requested, setRequested] = useState(false);
   const stopRequested = useRef(false);
   const connectedRef = useRef(connection.connected);
   connectedRef.current = connection.connected;
@@ -147,8 +150,11 @@ export function TableView({
   };
 
   useEffect(() => {
-    if (mode === 'data') load();
-  }, [load, mode]);
+    if (mode === 'data' && requested) load();
+  }, [load, mode, requested]);
+
+  /** Reload button: the first press starts loading, later presses fetch the current page again. */
+  const reload = () => (requested ? load() : setRequested(true));
 
   useEffect(() => {
     if (mode !== 'ddl' || ddl.text !== undefined) return;
@@ -164,6 +170,7 @@ export function TableView({
   const apply = (next: { filter?: string; orderBy?: string }) => {
     setOffset(0);
     setTotal({ status: 'idle' });
+    setRequested(true);
     setApplied((current) => ({ filter: next.filter ?? current.filter, orderBy: next.orderBy ?? current.orderBy }));
   };
 
@@ -264,7 +271,7 @@ export function TableView({
                 <Square size={13} fill="currentColor" />
               </button>
             ) : (
-              <button type="button" className="tool" title="Reload page" onClick={load} data-testid="reload">
+              <button type="button" className="tool" title="Load page" onClick={reload} data-testid="reload">
                 <RefreshCw size={15} />
               </button>
             )}
@@ -388,6 +395,11 @@ export function TableView({
           </div>
           <div className="table-body">
             <ProgressBar active={busy} />
+            {page.status === 'idle' && (
+              <div className="grid-message" data-testid="idle-message">
+                Write a filter and press Enter to load rows — or press Enter on an empty WHERE to load the first page.
+              </div>
+            )}
             {page.status === 'connecting' && (
               <SkeletonGrid
                 columns={relation.columns.map((c) => c.name)}
