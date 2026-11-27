@@ -49,6 +49,13 @@ async function snap(label: string): Promise<void> {
   await sleep(1500);
 }
 
+/** Presses Enter in the visible table tab's WHERE bar, which is what loads its rows. */
+async function loadVisibleTable(): Promise<void> {
+  const filter = await waitFor('filter input', () => visibleAll<HTMLInputElement>('[data-testid=filter-input]')[0]);
+  await waitFor('idle table', () => visibleAll('[data-testid=idle-message]')[0]);
+  (filter as HTMLInputElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+}
+
 async function step(name: string, body: () => Promise<void>): Promise<void> {
   const started = performance.now();
   await body();
@@ -86,6 +93,7 @@ async function sampleScenario(config: SelfTestConfig): Promise<void> {
   await step('click a table to open it in a tab (paging, filter, header sort, count)', async () => {
     treeRow('orders')!.click();
     await waitFor('orders tab', () => byText('.editor-tab .tab-label', `orders [${name}]`));
+    await loadVisibleTable();
     await waitFor('first page', () => pageRange() === '1–500' && pageRange());
     document.querySelector<HTMLButtonElement>('[data-testid=next-page]')!.click();
     await waitFor('second page', () => pageRange() === '501–1,000');
@@ -125,6 +133,7 @@ async function sampleScenario(config: SelfTestConfig): Promise<void> {
     if (!/view/.test(props.querySelector('.kind-label')?.textContent ?? '')) throw new Error('properties should say view');
     (await waitFor('open view button', () => byText('.modal-foot button', 'Open view'))).click();
     await waitFor('view tab', () => byText('.editor-tab .tab-label', `order_totals [${name}]`));
+    await loadVisibleTable();
     await waitFor('view rows', () => /^1–/.test(pageRange()));
     document.querySelector<HTMLButtonElement>('[data-testid=toggle-all-kinds]')!.click();
   });
@@ -363,6 +372,7 @@ async function loadingScenario(config: SelfTestConfig): Promise<void> {
   await step('opening a table shows a skeleton grid with its real columns first', async () => {
     const watch = watchAppearances(['[data-testid=skeleton-grid]', '.progress-bar.active']);
     treeRow('loading_demo')!.click();
+    await loadVisibleTable();
     await waitFor('first page', () => pageRange() === '1–500');
     watch.stop();
     expectSeen(watch, ['[data-testid=skeleton-grid]', '.progress-bar.active'], 'first load');
@@ -396,6 +406,7 @@ async function loadingScenario(config: SelfTestConfig): Promise<void> {
     document.querySelector<HTMLButtonElement>('[data-testid=toggle-all-kinds]')!.click();
     await waitFor('slow view in explorer', () => treeRow('slow_demo'));
     treeRow('slow_demo')!.click();
+    await loadVisibleTable();
     const skeleton = await waitFor('skeleton grid', () => visibleAll('[data-testid=skeleton-grid]')[0]);
     const headers = [...skeleton.querySelectorAll('.col-name')].map((h) => h.textContent).join(',');
     if (headers !== 'id,label,created_at,slept') throw new Error(`skeleton headers should be the view's columns, got ${headers}`);
